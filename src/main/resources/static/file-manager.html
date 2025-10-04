@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý File - FileStorage</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Google fonts-->
+    <link href="https://fonts.googleapis.com/css?family=Catamaran:100,200,300,400,500,600,700,800,900" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css?family=Lato:100,100i,300,300i,400,400i,700,700i,900,900i" rel="stylesheet" />
+    <link href="css/file-manager.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-custom">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/home">
+                <img src="/images/logos.svg" alt="FileStorage" class="logo-img">
+                FileStorage
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="/home">Trang chủ</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="/file-manager">Quản lý File</a></li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                            <div class="avatar me-2">
+                                <div class="avatar-ghost">👻</div>
+                            </div>
+                            <span id="userName">User</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#" onclick="showAccountSettings()">Cài đặt tài khoản</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="logout()">Đăng xuất</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-3 col-lg-2">
+                <div class="sidebar fade-in">
+                    <div class="sidebar-header">
+                        <h5><i class="fas fa-folder me-2"></i>Thư mục</h5>
+                    </div>
+                    <ul class="sidebar-menu">
+                        <li class="active">
+                            <a href="#" onclick="loadFiles('all')">
+                                <i class="fas fa-th-large me-2"></i>
+                                Tất cả file
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" onclick="loadFiles('images')">
+                                <i class="fas fa-image me-2"></i>
+                                Hình ảnh
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" onclick="loadFiles('documents')">
+                                <i class="fas fa-file-alt me-2"></i>
+                                Tài liệu
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" onclick="loadFiles('videos')">
+                                <i class="fas fa-video me-2"></i>
+                                Video
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" onclick="loadFiles('audio')">
+                                <i class="fas fa-music me-2"></i>
+                                Âm thanh
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Main Content Area -->
+            <div class="col-md-9 col-lg-10">
+                <!-- Header -->
+                <div class="file-manager-header fade-in">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <div>
+                            <h2><i class="fas fa-cloud-upload-alt me-2"></i>Quản lý File</h2>
+                            <p class="text-muted">Quản lý và tổ chức các file của bạn</p>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-outline-primary" onclick="refreshFiles()">
+                                <i class="fas fa-sync-alt me-1"></i>
+                                Làm mới
+                            </button>
+                            <button class="btn btn-primary" onclick="showUploadModal()">
+                                <i class="fas fa-upload me-1"></i>
+                                Tải lên
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search and Filter -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" id="searchInput" placeholder="Tìm kiếm file...">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select" id="sortSelect">
+                                <option value="name">Sắp xếp theo tên</option>
+                                <option value="date">Sắp xếp theo ngày</option>
+                                <option value="size">Sắp xếp theo kích thước</option>
+                                <option value="type">Sắp xếp theo loại</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="btn-group" role="group">
+                                <input type="radio" class="btn-check" name="viewMode" id="gridView" checked>
+                                <label class="btn btn-outline-secondary" for="gridView">
+                                    <i class="fas fa-th"></i>
+                                </label>
+                                <input type="radio" class="btn-check" name="viewMode" id="listView">
+                                <label class="btn btn-outline-secondary" for="listView">
+                                    <i class="fas fa-list"></i>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- File Grid -->
+                <div class="file-grid fade-in" id="fileGrid">
+                    <!-- Files will be loaded here -->
+                </div>
+
+                <!-- Empty State -->
+                <div class="empty-state text-center py-5 fade-in" id="emptyState" style="display: none;">
+                    <i class="fas fa-folder-open fa-4x text-muted mb-3"></i>
+                    <h4>Chưa có file nào</h4>
+                    <p class="text-muted">Hãy tải lên file đầu tiên của bạn</p>
+                    <button class="btn btn-primary" onclick="showUploadModal()">
+                        <i class="fas fa-upload me-1"></i>
+                        Tải lên file
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div class="modal fade" id="uploadModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-upload me-2"></i>
+                        Tải lên file
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="upload-area" id="uploadArea">
+                        <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                        <h5>Kéo thả file vào đây hoặc click để chọn</h5>
+                        <p class="text-muted">Hỗ trợ tất cả các loại file</p>
+                        <input type="file" id="fileInput" multiple style="display: none;">
+                    </div>
+                    <div id="uploadProgress" style="display: none;">
+                        <div class="progress mb-3">
+                            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <p class="text-center">Đang tải lên...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-primary" id="confirmUpload" disabled>Tải lên</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Details Modal -->
+    <div class="modal fade" id="fileDetailsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Chi tiết file
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="fileDetailsContent">
+                    <!-- File details will be loaded here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    <button type="button" class="btn btn-primary" id="downloadFileBtn">
+                        <i class="fas fa-download me-1"></i>
+                        Tải xuống
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/file-manager.js"></script>
+</body>
+</html>

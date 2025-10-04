@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng nhập - FileStorage</title>
+    <link rel="stylesheet" href="/css/login.css">
+</head>
+<body>
+    <!-- Floating Particles -->
+    <div class="particles">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+    </div>
+
+    <!-- Background Elements -->
+    <div class="background-container">
+        <div class="background-elements">
+            <!-- Logo Section -->
+            <div class="logo-section">
+                <div class="logo">
+                    <img src="/images/logos.svg" alt="FileStorage" class="logo-img">
+                    <div class="logo-text">
+                        <div class="main">8XBET</div>
+                        <div class="sub">SAVE FILE</div>
+                    </div>
+                </div>
+                <div class="cloud-icon">☁️</div>
+            </div>
+
+            <!-- Background Illustration -->
+            <div class="background-illustration">
+                <!-- Large Folder -->
+                <div class="folder-large">
+                    <!-- Document Icon inside folder -->
+                    <div class="document-icon"></div>
+                    <!-- Grid Icon inside folder -->
+                    <div class="grid-icon">
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                    </div>
+                </div>
+                
+                <!-- Upload Circle -->
+                <div class="upload-circle">
+                    <div class="upload-arrow"></div>
+                </div>
+                
+                <!-- Storage Box -->
+                <div class="storage-box"></div>
+            </div>
+
+            <!-- Footer Links -->
+            <div class="footer-links">
+                <a href="#">Hỗ trợ</a>
+                <a href="#">Chính sách</a>
+                <a href="#">Điều khoản sử dụng</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Form -->
+    <div class="login-container">
+        <h1 class="login-title">Đăng nhập</h1>
+        
+        <!-- Error/Success Messages -->
+        <div id="errorMessage" class="error-message"></div>
+        <div id="successMessage" class="success-message"></div>
+        
+        <form id="loginForm" action="/api/auth/login" method="POST">
+            <div class="form-group">
+                <input type="text" name="username" class="form-input" placeholder="Tài khoản" required>
+            </div>
+            
+            <div class="form-group">
+                <input type="password" name="password" class="form-input" placeholder="Mật khẩu" required>
+            </div>
+
+            <!-- Social Login Buttons -->
+            <div class="social-login">
+                <button type="button" class="social-btn facebook">f</button>
+                <button type="button" class="social-btn google">G</button>
+                <button type="button" class="social-btn apple">🍎</button>
+            </div>
+
+            <!-- Remember Login -->
+            <div class="remember-section">
+                <input type="checkbox" id="remember" class="remember-checkbox">
+                <label for="remember" class="remember-label">Lưu đăng nhập</label>
+            </div>
+
+            <!-- Login Button -->
+            <button type="submit" class="login-btn">Đăng nhập</button>
+
+            <!-- Login Links -->
+            <div class="login-links">
+                <a href="#">KHÔNG THỂ ĐĂNG NHẬP?</a>
+                <a href="/register">TẠO TÀI KHOẢN</a>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Hide previous messages
+            hideMessages();
+            
+            // Show loading state
+            const submitBtn = this.querySelector('.login-btn');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Đang đăng nhập...';
+            submitBtn.disabled = true;
+            
+            const formData = new FormData(this);
+            const loginData = {
+                username: formData.get('username'),
+                password: formData.get('password')
+            };
+
+            try {
+                console.log('Sending login request:', loginData);
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(loginData)
+                });
+
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                
+                const result = await response.json();
+                console.log('Response data:', result);
+
+                if (response.ok) {
+                    // Lưu token vào localStorage
+                    localStorage.setItem('token', result.token);
+                    showSuccessMessage('Đăng nhập thành công! Đang chuyển hướng...');
+                    
+                    // Chuyển hướng đến trang chính sau 1.5 giây
+                    setTimeout(() => {
+                        window.location.href = '/home';
+                    }, 1500);
+                } else {
+                    showErrorMessage(result.message || 'Tài khoản hoặc mật khẩu không đúng');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showErrorMessage('Có lỗi xảy ra khi đăng nhập. Vui lòng thử lại.');
+            } finally {
+                // Reset button state
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Social login buttons (placeholder functionality)
+        document.querySelectorAll('.social-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                showErrorMessage('Tính năng đăng nhập xã hội đang được phát triển');
+            });
+        });
+
+        // Helper functions for messages
+        function showErrorMessage(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function showSuccessMessage(message) {
+            const successDiv = document.getElementById('successMessage');
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+        }
+
+        function hideMessages() {
+            document.getElementById('errorMessage').style.display = 'none';
+            document.getElementById('successMessage').style.display = 'none';
+        }
+
+        // Check if user is already logged in
+        window.addEventListener('load', function() {
+            const token = localStorage.getItem('token');
+            if (token) {
+                // Verify token is still valid by making a test request
+                fetch('/api/users', {
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    }
+                })
+                .then(response => {
+                    if (response.ok) {
+                        // Token is valid, redirect to home
+                        window.location.href = '/home';
+                    } else {
+                        // Token is invalid, remove it
+                        localStorage.removeItem('token');
+                    }
+                })
+                .catch(() => {
+                    // Error occurred, remove token
+                    localStorage.removeItem('token');
+                });
+            }
+        });
+    </script>
+</body>
+</html>

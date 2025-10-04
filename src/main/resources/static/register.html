@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng ký - FileStorage</title>
+    <link rel="stylesheet" href="/css/register.css">
+</head>
+<body>
+    <!-- Floating Particles -->
+    <div class="particles">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+    </div>
+
+    <!-- Background Elements -->
+    <div class="background-container">
+        <div class="background-elements">
+            <!-- Logo Section -->
+            <div class="logo-section">
+                <div class="logo">
+                    <img src="/images/logos.svg" alt="FileStorage" class="logo-img">
+                    <div class="logo-text">
+                        <div class="main">8XBET</div>
+                        <div class="sub">SAVE File</div>
+                    </div>
+                </div>
+                <div class="cloud-icon">☁️</div>
+            </div>
+
+            <!-- Background Illustration -->
+            <div class="background-illustration">
+                <!-- Large Folder -->
+                <div class="folder-large">
+                    <!-- Document Icon inside folder -->
+                    <div class="document-icon"></div>
+                    <!-- Grid Icon inside folder -->
+                    <div class="grid-icon">
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                    </div>
+                </div>
+                
+                <!-- Upload Circle -->
+                <div class="upload-circle">
+                    <div class="upload-arrow"></div>
+                </div>
+                
+                <!-- Storage Box -->
+                <div class="storage-box"></div>
+            </div>
+
+            <!-- Footer Links -->
+            <div class="footer-links">
+                <a href="#">Hỗ trợ</a>
+                <a href="#">Chính sách</a>
+                <a href="#">Điều khoản sử dụng</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Register Form -->
+    <div class="register-container">
+        <h1 class="register-title">Đăng ký</h1>
+        
+        <!-- Error/Success Messages -->
+        <div id="errorMessage" class="error-message"></div>
+        <div id="successMessage" class="success-message"></div>
+        
+        <form id="registerForm" action="/api/users" method="POST">
+            <div class="form-group">
+                <label class="form-label" for="email">Nhập Email</label>
+                <input type="email" id="email" name="email" class="form-input" placeholder="Email" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="username">Nhập Tài Khoản</label>
+                <input type="text" id="username" name="username" class="form-input" placeholder="Tài khoản" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="password">Nhập Mật Khẩu</label>
+                <input type="password" id="password" name="password" class="form-input" placeholder="Mật khẩu" required>
+            </div>
+
+            <!-- Social Register -->
+            <div class="social-register">
+                <label class="social-label">Bạn có thể tạo tài khoản với</label>
+                <div class="social-buttons">
+                    <button type="button" class="social-btn facebook">f</button>
+                    <button type="button" class="social-btn google">G</button>
+                    <button type="button" class="social-btn apple">🍎</button>
+                </div>
+            </div>
+
+            <!-- Register Button -->
+            <button type="submit" class="register-btn">Đăng ký</button>
+
+            <!-- Login Link -->
+            <div class="register-links">
+                <a href="/login">ĐÃ CÓ TÀI KHOẢN?</a>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('registerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Hide previous messages
+            hideMessages();
+            
+            // Show loading state
+            const submitBtn = this.querySelector('.register-btn');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Đang đăng ký...';
+            submitBtn.disabled = true;
+            
+            const formData = new FormData(this);
+            const registerData = {
+                email: formData.get('email'),
+                username: formData.get('username'),
+                password: formData.get('password')
+            };
+
+            try {
+                console.log('Sending register request:', registerData);
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(registerData)
+                });
+
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                
+                const result = await response.json();
+                console.log('Response data:', result);
+
+                if (response.ok) {
+                    showSuccessMessage('Đăng ký thành công! Đang chuyển hướng đến trang đăng nhập...');
+                    
+                    // Chuyển hướng đến trang đăng nhập sau 2 giây
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                } else {
+                    // Xử lý lỗi validation
+                    if (result.errors) {
+                        let errorMsg = 'Có lỗi xảy ra:\n';
+                        result.errors.forEach(error => {
+                            errorMsg += `- ${error.field}: ${error.message}\n`;
+                        });
+                        showErrorMessage(errorMsg);
+                    } else {
+                        showErrorMessage(result.message || 'Có lỗi xảy ra khi đăng ký. Vui lòng thử lại.');
+                    }
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showErrorMessage('Có lỗi xảy ra khi đăng ký. Vui lòng thử lại.');
+            } finally {
+                // Reset button state
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Social register buttons (placeholder functionality)
+        document.querySelectorAll('.social-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                showErrorMessage('Tính năng đăng ký xã hội đang được phát triển');
+            });
+        });
+
+        // Helper functions for messages
+        function showErrorMessage(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function showSuccessMessage(message) {
+            const successDiv = document.getElementById('successMessage');
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+        }
+
+        function hideMessages() {
+            document.getElementById('errorMessage').style.display = 'none';
+            document.getElementById('successMessage').style.display = 'none';
+        }
+
+        // Check if user is already logged in
+        window.addEventListener('load', function() {
+            const token = localStorage.getItem('token');
+            if (token) {
+                // If already logged in, redirect to dashboard
+                window.location.href = '/dashboard';
+            }
+        });
+
+        // Form validation
+        document.getElementById('registerForm').addEventListener('input', function() {
+            const email = document.getElementById('email').value;
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            // Basic validation
+            if (email && !isValidEmail(email)) {
+                showErrorMessage('Email không hợp lệ');
+                return;
+            }
+
+            if (username && username.length < 3) {
+                showErrorMessage('Tên tài khoản phải có ít nhất 3 ký tự');
+                return;
+            }
+
+            if (password && password.length < 6) {
+                showErrorMessage('Mật khẩu phải có ít nhất 6 ký tự');
+                return;
+            }
+
+            // Hide error if all validations pass
+            hideMessages();
+        });
+
+        function isValidEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
+    </script>
+</body>
+</html>

@@ -28,7 +28,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/users").permitAll() // allow registration
+                        .requestMatchers("/api/users/me").authenticated() // allow current user info
                         .requestMatchers("/api/users/**").authenticated()
+                        .requestMatchers("/", "/home", "/home.html", "/login", "/login.html", "/register", "/register.html", "/file-manager", "/file-manager.html", "/css/**", "/js/**", "/images/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
