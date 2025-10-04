@@ -4,6 +4,7 @@ import com.example.FileStorage.entity.FileEntity;
 import com.example.FileStorage.entity.User;
 import com.example.FileStorage.repository.UserRepository;
 import com.example.FileStorage.service.FileService;
+import com.example.FileStorage.websocket.NotificationService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -30,13 +31,15 @@ public class FileController {
 
     private final FileService fileService;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @Value("${file.upload-dir}")   // Lấy từ application.properties
     private String uploadDir;
 
-    public FileController(FileService fileService, UserRepository userRepository) {
+    public FileController(FileService fileService, UserRepository userRepository, NotificationService notificationService) {
         this.fileService = fileService;
         this.userRepository = userRepository;
+        this.notificationService = notificationService;
     }
 
     // 🔹 Lấy danh sách file theo userId
@@ -93,6 +96,10 @@ public class FileController {
 
         FileEntity savedFile = fileService.saveFile(fileEntity);
 
+        // Send real-time notification
+        notificationService.notifyFileUploaded(user, originalFileName);
+        notificationService.broadcastFileUpdate(userId, "upload", originalFileName);
+
         return ResponseEntity.ok(savedFile);
     }
 
@@ -108,6 +115,10 @@ public class FileController {
         }
 
         Resource resource = new FileSystemResource(file);
+
+        // Send real-time notification for download
+        notificationService.notifyFileDownloaded(fileEntity.getUser(), fileEntity.getFileName());
+        notificationService.broadcastFileUpdate(fileEntity.getUser().getId(), "download", fileEntity.getFileName());
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -132,6 +143,10 @@ public class FileController {
         if (file.exists()) {
             file.delete();
         }
+
+        // Send real-time notification for deletion
+        notificationService.notifyFileDeleted(fileEntity.getUser(), fileEntity.getFileName());
+        notificationService.broadcastFileUpdate(fileEntity.getUser().getId(), "delete", fileEntity.getFileName());
 
         // Xóa metadata trong DB
         fileService.deleteFile(id);

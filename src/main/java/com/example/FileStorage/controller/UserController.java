@@ -4,6 +4,7 @@ import com.example.FileStorage.dto.UserRequest;
 import com.example.FileStorage.dto.UserResponse;
 import com.example.FileStorage.entity.User;
 import com.example.FileStorage.service.UserService;
+import com.example.FileStorage.websocket.NotificationService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,9 +23,11 @@ import java.util.stream.Collectors;
 public class UserController {
 
     private final UserService userService;
+    private final NotificationService notificationService;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, NotificationService notificationService) {
         this.userService = userService;
+        this.notificationService = notificationService;
     }
 
     @GetMapping
@@ -70,6 +73,10 @@ public class UserController {
             user.setEmail(request.getEmail());
             user.setPassword(request.getPassword());
             User saved = userService.createUser(user);
+            
+            // Send real-time notification for new user registration
+            notificationService.notifyNewUserRegistered(saved.getUsername());
+            
             return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(saved));
         } catch (Exception ex) {
             Map<String, String> error = new HashMap<>();

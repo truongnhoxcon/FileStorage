@@ -33,8 +33,14 @@ function checkAuth() {
     })
     .then(user => {
         currentUser = user;
+        window.currentUser = user; // Make available globally for WebSocket
         document.getElementById('userName').textContent = user.username;
         loadFiles();
+        
+        // Show live indicator when WebSocket connects
+        if (wsClient && wsClient.isConnected) {
+            document.getElementById('liveIndicator').style.display = 'inline-flex';
+        }
     })
     .catch(() => {
         localStorage.removeItem('token');
@@ -283,7 +289,7 @@ function deleteFile(fileId) {
     .then(response => {
         if (response.ok) {
             loadFiles(); // Reload files
-            alert('File đã được xóa thành công!');
+            showNotification('info', 'File đã xóa', 'File đã được xóa thành công!');
         } else {
             throw new Error('Failed to delete file');
         }
@@ -415,7 +421,9 @@ function uploadFiles(files) {
         console.log('Upload successful:', data);
         loadFiles(); // Reload file list
         bootstrap.Modal.getInstance(document.getElementById('uploadModal')).hide();
-        alert('Upload thành công!');
+        
+        // Show success notification
+        showNotification('success', 'Upload thành công!', `File "${data.fileName}" đã được tải lên thành công.`);
     })
     .catch(error => {
         console.error('Upload error:', error);
@@ -458,4 +466,63 @@ function logout() {
 // Show account settings
 function showAccountSettings() {
     alert('Tính năng cài đặt tài khoản đang được phát triển!');
+}
+
+// Notification helper functions
+function showNotification(type, title, message) {
+    const notificationElement = document.createElement('div');
+    notificationElement.className = `notification notification-${type}`;
+    notificationElement.innerHTML = `
+        <div class="notification-content">
+            <div class="notification-title">${title}</div>
+            <div class="notification-message">${message}</div>
+            <div class="notification-time">${new Date().toLocaleTimeString()}</div>
+        </div>
+        <button class="notification-close" onclick="this.parentElement.remove()">×</button>
+    `;
+
+    let container = document.getElementById('notification-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'notification-container';
+        container.className = 'notification-container';
+        document.body.appendChild(container);
+    }
+
+    container.appendChild(notificationElement);
+
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        if (notificationElement.parentElement) {
+            notificationElement.remove();
+        }
+    }, 5000);
+}
+
+// Real-time file update handler
+function handleRealtimeFileUpdate(update) {
+    console.log('Real-time file update:', update);
+    
+    // Refresh file list
+    if (typeof loadFiles === 'function') {
+        loadFiles();
+    }
+    
+    // Show update notification
+    const actionText = {
+        'upload': 'đã tải lên',
+        'download': 'đã tải xuống', 
+        'delete': 'đã xóa'
+    };
+    
+    const message = `File "${update.fileName}" ${actionText[update.action] || update.action}`;
+    showNotification('info', 'File Update', message);
+}
+
+// WebSocket connection status handler
+function handleWebSocketStatus(connected) {
+    const liveIndicator = document.getElementById('liveIndicator');
+    if (liveIndicator) {
+        liveIndicator.style.display = connected ? 'inline-flex' : 'none';
+    }
 }

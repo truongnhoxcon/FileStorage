@@ -15,4 +15,9 @@ public class WebController {
     public String register() {
         return "forward:/register.html";
     }
+
+    @GetMapping("/realtime-demo")
+    public String realtimeDemo() {
+        return "forward:/realtime-demo.html";
+    }
 }
