@@ -225,14 +225,50 @@ function selectFile(fileId) {
 
 // Download file
 function downloadFile(fileId) {
-    const token = localStorage.getItem('token');
-    const link = document.createElement('a');
-    link.href = `/api/files/download/${fileId}`;
-    link.setAttribute('Authorization', `Bearer ${token}`);
-    link.download = '';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+	const token = localStorage.getItem('token');
+	if (!token) {
+		alert('Bạn cần đăng nhập để tải file.');
+		window.location.href = '/login';
+		return;
+	}
+
+	fetch(`/api/files/download/${fileId}`, {
+		headers: {
+			'Authorization': 'Bearer ' + token
+		}
+	})
+	.then(response => {
+		if (!response.ok) {
+			if (response.status === 401 || response.status === 403) {
+				throw new Error('Không có quyền tải xuống file này.');
+			}
+			throw new Error('Tải xuống thất bại.');
+		}
+
+		// Lấy tên file từ header nếu có
+		const disposition = response.headers.get('Content-Disposition') || '';
+		let filename = 'download';
+		const match = disposition.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i);
+		if (match) {
+			filename = decodeURIComponent(match[1] || match[2]);
+		}
+
+		return response.blob().then(blob => ({ blob, filename }));
+	})
+	.then(({ blob, filename }) => {
+		const url = window.URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = filename;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		window.URL.revokeObjectURL(url);
+	})
+	.catch(err => {
+		console.error('Download error:', err);
+		alert(err.message || 'Không thể tải xuống file.');
+	});
 }
 
 // Show file details

@@ -2,6 +2,7 @@
 class WebSocketClient {
     constructor() {
         this.socket = null;
+        this.stomp = null;
         this.isConnected = false;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
@@ -16,31 +17,29 @@ class WebSocketClient {
         }
 
         try {
-            // Use SockJS for better browser compatibility
+            // SockJS transport + STOMP subprotocol
             this.socket = new SockJS('/ws');
-            
-            this.socket.onopen = () => {
-                console.log('WebSocket connected');
-                this.isConnected = true;
-                this.reconnectAttempts = 0;
-                this.onConnected();
-            };
+            this.stomp = Stomp.over(this.socket);
+            // Optional: silence debug logs
+            if (this.stomp && this.stomp.debug) {
+                this.stomp.debug = null;
+            }
 
-            this.socket.onmessage = (event) => {
-                this.handleMessage(event);
-            };
-
-            this.socket.onclose = (event) => {
-                console.log('WebSocket disconnected:', event);
-                this.isConnected = false;
-                this.onDisconnected();
-                this.attemptReconnect();
-            };
-
-            this.socket.onerror = (error) => {
-                console.error('WebSocket error:', error);
-                this.onError(error);
-            };
+            this.stomp.connect(
+                { 'Authorization': 'Bearer ' + this.token },
+                () => {
+                    console.log('STOMP connected');
+                    this.isConnected = true;
+                    this.reconnectAttempts = 0;
+                    this.onConnected();
+                },
+                (error) => {
+                    console.error('STOMP connection error:', error);
+                    this.isConnected = false;
+                    this.onDisconnected();
+                    this.attemptReconnect();
+                }
+            );
 
         } catch (error) {
             console.error('Failed to create WebSocket connection:', error);
@@ -48,11 +47,16 @@ class WebSocketClient {
     }
 
     disconnect() {
-        if (this.socket) {
-            this.socket.close();
-            this.socket = null;
-            this.isConnected = false;
-        }
+        try {
+            if (this.stomp && this.stomp.connected) {
+                this.stomp.disconnect(() => {
+                    this.isConnected = false;
+                    this.onDisconnected();
+                });
+            }
+        } catch (_) {}
+        this.socket = null;
+        this.stomp = null;
     }
 
     attemptReconnect() {
@@ -69,45 +73,29 @@ class WebSocketClient {
     }
 
     sendMessage(destination, message) {
-        if (this.socket && this.isConnected) {
-            this.socket.send(JSON.stringify({
-                destination: destination,
-                body: message
-            }));
+        if (this.stomp && this.isConnected) {
+            this.stomp.send(destination, {}, JSON.stringify(message));
         } else {
             console.warn('WebSocket not connected, cannot send message');
         }
     }
 
     subscribeToNotifications() {
-        if (this.socket && this.isConnected) {
-            // Subscribe to user-specific notifications
-            this.socket.send(JSON.stringify({
-                command: 'SUBSCRIBE',
-                destination: '/user/queue/notifications',
-                id: 'notifications'
-            }));
+        if (this.stomp && this.isConnected) {
+            this.stomp.subscribe('/user/queue/notifications', (msg) => this.handleFrame(msg));
+            this.stomp.subscribe('/topic/notifications', (msg) => this.handleFrame(msg));
+            this.stomp.subscribe('/topic/file-updates', (msg) => this.handleFrame(msg));
+            this.stomp.subscribe('/topic/user-activity', (msg) => this.handleFrame(msg));
+        }
+    }
 
-            // Subscribe to broadcast notifications
-            this.socket.send(JSON.stringify({
-                command: 'SUBSCRIBE',
-                destination: '/topic/notifications',
-                id: 'broadcast-notifications'
-            }));
-
-            // Subscribe to file updates
-            this.socket.send(JSON.stringify({
-                command: 'SUBSCRIBE',
-                destination: '/topic/file-updates',
-                id: 'file-updates'
-            }));
-
-            // Subscribe to user activity
-            this.socket.send(JSON.stringify({
-                command: 'SUBSCRIBE',
-                destination: '/topic/user-activity',
-                id: 'user-activity'
-            }));
+    handleFrame(frame) {
+        try {
+            const body = frame && frame.body ? JSON.parse(frame.body) : null;
+            if (!body) return;
+            this.routeMessage(body);
+        } catch (e) {
+            console.error('Error handling STOMP frame:', e);
         }
     }
 
@@ -115,29 +103,31 @@ class WebSocketClient {
         try {
             const message = JSON.parse(event.data);
             console.log('Received WebSocket message:', message);
-
-            // Handle different message types
-            switch (message.type) {
-                case 'notification':
-                    this.handleNotification(message);
-                    break;
-                case 'file-update':
-                    this.handleFileUpdate(message);
-                    break;
-                case 'user-activity':
-                    this.handleUserActivity(message);
-                    break;
-                case 'chat':
-                    this.handleChatMessage(message);
-                    break;
-                case 'file-status':
-                    this.handleFileStatus(message);
-                    break;
-                default:
-                    console.log('Unknown message type:', message.type);
-            }
+            this.routeMessage(message);
         } catch (error) {
             console.error('Error parsing WebSocket message:', error);
+        }
+    }
+
+    routeMessage(message) {
+        switch (message.type) {
+            case 'notification':
+                this.handleNotification(message);
+                break;
+            case 'file-update':
+                this.handleFileUpdate(message);
+                break;
+            case 'user-activity':
+                this.handleUserActivity(message);
+                break;
+            case 'chat':
+                this.handleChatMessage(message);
+                break;
+            case 'file-status':
+                this.handleFileStatus(message);
+                break;
+            default:
+                console.log('Unknown message type:', message.type);
         }
     }
 
@@ -265,16 +255,25 @@ class WebSocketClient {
         this.subscribeToNotifications();
         
         // Show connection status
+        if (typeof handleWebSocketStatus === 'function') {
+            handleWebSocketStatus(true);
+        }
         this.showConnectionStatus('connected');
     }
 
     onDisconnected() {
         console.log('WebSocket disconnected');
+        if (typeof handleWebSocketStatus === 'function') {
+            handleWebSocketStatus(false);
+        }
         this.showConnectionStatus('disconnected');
     }
 
     onError(error) {
         console.error('WebSocket error:', error);
+        if (typeof handleWebSocketStatus === 'function') {
+            handleWebSocketStatus(false);
+        }
         this.showConnectionStatus('error');
     }
 
