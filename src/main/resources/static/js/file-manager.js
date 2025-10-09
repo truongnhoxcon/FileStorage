@@ -3,6 +3,7 @@ let currentUser = null;
 let currentFiles = [];
 let currentCategory = 'all';
 let selectedFiles = new Set();
+let currentFolder = null; // giữ thư mục đang mở (FileEntity có fileType='directory')
 
 document.addEventListener('DOMContentLoaded', function() {
     checkAuth();
@@ -109,6 +110,32 @@ function filterAndDisplayFiles() {
         });
     }
     
+    // Nếu đang mở thư mục, chỉ hiển thị file/thư mục bên trong thư mục đó
+    if (currentFolder && currentFolder.storagePath) {
+        const basePath = normalizePath(currentFolder.storagePath);
+        filteredFiles = filteredFiles.filter(file => {
+            if (!file || !file.storagePath) return false;
+            const p = normalizePath(file.storagePath);
+            // loại trừ chính thư mục
+            if (file.id === currentFolder.id) return false;
+            return p.startsWith(basePath + '/');
+        });
+    } else {
+        // Ở chế độ gốc (không mở thư mục), ẩn các file nằm bên trong bất kỳ thư mục nào
+        const folderPaths = currentFiles
+            .filter(f => f && f.fileType === 'directory' && f.storagePath)
+            .map(f => normalizePath(f.storagePath) + '/');
+        if (folderPaths.length > 0) {
+            filteredFiles = filteredFiles.filter(file => {
+                if (!file || !file.storagePath) return false;
+                if (file.fileType === 'directory') return true; // luôn hiển thị thư mục ở cấp gốc
+                const p = normalizePath(file.storagePath);
+                // nếu file nằm dưới bất kỳ thư mục nào, ẩn ở chế độ gốc
+                return !folderPaths.some(fp => p.startsWith(fp));
+            });
+        }
+    }
+
     // Apply search filter
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     if (searchTerm) {
@@ -160,8 +187,11 @@ function createFileItem(file) {
     const fileSize = formatFileSize(file.fileSize);
     const uploadDate = new Date(file.uploadedAt).toLocaleDateString('vi-VN');
     
+    const isDirectory = (file.fileType === 'directory');
+    const onClick = isDirectory ? `openFolder(${file.id})` : `selectFile(${file.id})`;
+
     return `
-        <div class="file-item" data-file-id="${file.id}" onclick="selectFile(${file.id})">
+        <div class="file-item" data-file-id="${file.id}" onclick="${onClick}">
             <div class="file-icon ${fileIcon.class}">
                 <i class="${fileIcon.icon}"></i>
             </div>
@@ -185,6 +215,7 @@ function createFileItem(file) {
 
 // Get file icon based on type
 function getFileIcon(fileType) {
+    if (fileType === 'directory') return { class: 'folder', icon: 'fas fa-folder' };
     if (!fileType) return { class: 'default', icon: 'fas fa-file' };
     
     if (fileType.startsWith('image/')) {
@@ -345,6 +376,43 @@ function showUploadModal() {
     modal.show();
 }
 
+// Create new folder
+function createFolder() {
+    if (!currentUser) {
+        alert('Bạn cần đăng nhập.');
+        return;
+    }
+    const name = prompt('Nhập tên thư mục mới:');
+    if (!name || !name.trim()) return;
+
+    const form = new URLSearchParams();
+    form.append('name', name.trim());
+    form.append('userId', currentUser.id);
+
+    fetch('/api/files/folder', {
+        method: 'POST',
+        headers: {
+            'Authorization': 'Bearer ' + localStorage.getItem('token'),
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: form.toString()
+    })
+    .then(resp => {
+        if (!resp.ok) {
+            return resp.text().then(t => { throw new Error(t || 'Tạo thư mục thất bại'); });
+        }
+        return resp.json();
+    })
+    .then(() => {
+        showNotification('success', 'Thành công', 'Đã tạo thư mục mới.');
+        refreshFiles();
+    })
+    .catch(err => {
+        console.error('Create folder error:', err);
+        alert('Không thể tạo thư mục: ' + (err.message || 'Lỗi không xác định'));
+    });
+}
+
 // Setup event listeners
 function setupEventListeners() {
     // Upload area click
@@ -433,7 +501,13 @@ function uploadFiles(files) {
     document.getElementById('uploadProgress').style.display = 'block';
     const progressBar = document.querySelector('.progress-bar');
     
-    fetch('/api/files/upload', {
+    const isInFolder = !!(currentFolder && currentFolder.id);
+    const url = isInFolder ? '/api/files/upload-to-folder' : '/api/files/upload';
+    if (isInFolder) {
+        formData.append('folderId', currentFolder.id);
+    }
+
+    fetch(url, {
         method: 'POST',
         headers: {
             'Authorization': 'Bearer ' + localStorage.getItem('token')
@@ -561,4 +635,23 @@ function handleWebSocketStatus(connected) {
     if (liveIndicator) {
         liveIndicator.style.display = connected ? 'inline-flex' : 'none';
     }
+}
+
+// --------- Folder navigation helpers ---------
+function openFolder(fileId) {
+    const folder = currentFiles.find(f => f.id === fileId);
+    if (!folder || folder.fileType !== 'directory') return;
+    currentFolder = folder;
+    filterAndDisplayFiles();
+}
+
+function exitFolder() {
+    currentFolder = null;
+    filterAndDisplayFiles();
+}
+
+function normalizePath(p) {
+    // chuyển về dạng với dấu gạch chéo / để so sánh ổn định (Windows -> POSIX)
+    // lưu ý: cần thay thế MỘT ký tự backslash, không phải cặp backslash
+    return String(p).replace(/\\/g, '/');
 }
