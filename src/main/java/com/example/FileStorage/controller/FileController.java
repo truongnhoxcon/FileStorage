@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -24,6 +26,8 @@ import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @RestController
 @RequestMapping("/api/files")
@@ -238,18 +242,68 @@ public class FileController {
             return ResponseEntity.notFound().build();
         }
 
+        // Nếu là thư mục: nén ZIP tạm thời và trả về file ZIP
+        if ("directory".equalsIgnoreCase(fileEntity.getFileType()) || file.isDirectory()) {
+            try {
+                Path zipPath = createZipFromDirectory(Paths.get(file.getAbsolutePath()), fileEntity.getFileName());
+                File zipFile = zipPath.toFile();
+                Resource zipResource = new FileSystemResource(zipFile);
+
+                // Thông báo realtime
+                notificationService.notifyFileDownloaded(fileEntity.getUser(), fileEntity.getFileName());
+                notificationService.broadcastFileUpdate(fileEntity.getUser().getId(), "download", fileEntity.getFileName());
+
+                return ResponseEntity.ok()
+                        .header(HttpHeaders.CONTENT_DISPOSITION,
+                                "attachment; filename=\"" + fileEntity.getFileName() + ".zip\"")
+                        .contentType(MediaType.parseMediaType("application/zip"))
+                        .contentLength(zipFile.length())
+                        .body(zipResource);
+            } catch (IOException ex) {
+                return ResponseEntity.internalServerError().build();
+            }
+        }
+
         Resource resource = new FileSystemResource(file);
 
         // Send real-time notification for download
         notificationService.notifyFileDownloaded(fileEntity.getUser(), fileEntity.getFileName());
         notificationService.broadcastFileUpdate(fileEntity.getUser().getId(), "download", fileEntity.getFileName());
 
+        MediaType contentType;
+        try {
+            contentType = fileEntity.getFileType() != null ? MediaType.parseMediaType(fileEntity.getFileType()) : MediaType.APPLICATION_OCTET_STREAM;
+        } catch (Exception e) {
+            contentType = MediaType.APPLICATION_OCTET_STREAM;
+        }
+
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"" + fileEntity.getFileName() + "\"")
-                .contentType(MediaType.parseMediaType(fileEntity.getFileType()))
+                .contentType(contentType)
                 .contentLength(file.length())
                 .body(resource);
+    }
+
+    private Path createZipFromDirectory(Path sourceDir, String folderName) throws IOException {
+        Path tempZip = Files.createTempFile(folderName + "_", ".zip");
+        try (ZipOutputStream zos = new ZipOutputStream(new FileOutputStream(tempZip.toFile()))) {
+            Path basePath = sourceDir;
+            Files.walk(basePath)
+                    .filter(path -> !Files.isDirectory(path))
+                    .forEach(path -> {
+                        String entryName = basePath.relativize(path).toString().replace('\\', '/');
+                        try (InputStream in = new FileInputStream(path.toFile())) {
+                            ZipEntry zipEntry = new ZipEntry(entryName);
+                            zos.putNextEntry(zipEntry);
+                            in.transferTo(zos);
+                            zos.closeEntry();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+        }
+        return tempZip;
     }
 
     // 🔹 Xóa file
