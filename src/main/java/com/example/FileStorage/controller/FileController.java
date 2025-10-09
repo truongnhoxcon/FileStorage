@@ -103,6 +103,130 @@ public class FileController {
         return ResponseEntity.ok(savedFile);
     }
 
+    // 🔹 Tạo thư mục
+    @PostMapping("/folder")
+    public ResponseEntity<?> createFolder(
+            @RequestParam("name") String folderName,
+            @RequestParam("userId") Long userId) throws IOException {
+
+        // Kiểm tra user tồn tại
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("❌ User not found with id: " + userId));
+
+        // Validate tên thư mục tối thiểu
+        if (folderName == null || folderName.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("❌ Folder name is required");
+        }
+
+        // Loại bỏ path traversal và ký tự nguy hiểm, chỉ giữ tên cuối cùng
+        String safeFolderName = Paths.get(folderName.trim()).getFileName().toString();
+        // Không cho phép các tên đặc biệt có thể gây lỗi trên Windows/Linux
+        if (".".equals(safeFolderName) || "..".equals(safeFolderName)) {
+            return ResponseEntity.badRequest().body("❌ Invalid folder name");
+        }
+
+        Path baseUploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+        Files.createDirectories(baseUploadPath);
+
+        Path folderPath = baseUploadPath.resolve(safeFolderName).normalize();
+        // Đảm bảo vẫn nằm trong thư mục gốc
+        if (!folderPath.startsWith(baseUploadPath)) {
+            return ResponseEntity.badRequest().body("❌ Invalid folder path");
+        }
+
+        // Tạo thư mục nếu chưa tồn tại
+        if (!Files.exists(folderPath)) {
+            Files.createDirectories(folderPath);
+        } else if (!Files.isDirectory(folderPath)) {
+            return ResponseEntity.status(409).body("❌ A file with the same name already exists");
+        } else {
+            // Nếu thư mục đã tồn tại, trả về 409 để client xử lý (hoặc có thể coi là OK idempotent)
+            return ResponseEntity.status(409).body("❌ Folder already exists");
+        }
+
+        // Lưu metadata thư mục vào DB
+        FileEntity folderEntity = new FileEntity();
+        folderEntity.setFileName(safeFolderName);
+        folderEntity.setFileType("directory");
+        folderEntity.setFileSize(0L);
+        folderEntity.setStoragePath(folderPath.toString());
+        folderEntity.setUser(user);
+        folderEntity.setUploadedAt(LocalDateTime.now());
+
+        FileEntity savedFolder = fileService.saveFile(folderEntity);
+
+        // Gửi thông báo realtime
+        notificationService.broadcastFileUpdate(userId, "create-folder", safeFolderName);
+
+        return ResponseEntity.ok(savedFolder);
+    }
+
+    // 🔹 Upload file vào thư mục
+    @PostMapping("/upload-to-folder")
+    public ResponseEntity<?> uploadFileToFolder(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("folderId") Long folderId,
+            @RequestParam("userId") Long userId
+    ) throws IOException {
+
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body("❌ File is empty!");
+        }
+
+        // Lấy thông tin thư mục
+        FileEntity folderEntity = fileService.getFileById(folderId)
+                .orElseThrow(() -> new RuntimeException("❌ Folder not found with id: " + folderId));
+
+        // Kiểm tra thư mục hợp lệ
+        if (!"directory".equalsIgnoreCase(folderEntity.getFileType())) {
+            return ResponseEntity.badRequest().body("❌ Target is not a directory");
+        }
+
+        // Kiểm tra sở hữu: thư mục phải thuộc về user
+        if (folderEntity.getUser() == null || !folderEntity.getUser().getId().equals(userId)) {
+            return ResponseEntity.status(403).body("❌ Folder does not belong to the user");
+        }
+
+        // Xác thực user tồn tại
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("❌ User not found with id: " + userId));
+
+        // Đảm bảo đường dẫn thư mục nằm trong uploadDir
+        Path baseUploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+        Path targetFolderPath = Paths.get(folderEntity.getStoragePath()).toAbsolutePath().normalize();
+        if (!targetFolderPath.startsWith(baseUploadPath)) {
+            return ResponseEntity.badRequest().body("❌ Invalid folder path");
+        }
+
+        // Sanitized file name
+        String originalFileName = file.getOriginalFilename();
+        String safeFileName = originalFileName == null ? "file" : Paths.get(originalFileName).getFileName().toString();
+        String uniqueFileName = System.currentTimeMillis() + "_" + safeFileName;
+        Path destinationPath = targetFolderPath.resolve(uniqueFileName).normalize();
+
+        // Ghi file
+        try (InputStream inputStream = file.getInputStream()) {
+            Files.copy(inputStream, destinationPath, StandardCopyOption.REPLACE_EXISTING);
+        }
+
+        // Lưu metadata file
+        FileEntity fileEntity = new FileEntity();
+        fileEntity.setFileName(originalFileName);
+        fileEntity.setFileType(file.getContentType());
+        fileEntity.setFileSize(file.getSize());
+        fileEntity.setStoragePath(destinationPath.toString());
+        fileEntity.setUser(user);
+        fileEntity.setUploadedAt(LocalDateTime.now());
+
+        FileEntity savedFile = fileService.saveFile(fileEntity);
+
+        // Thông báo realtime
+        notificationService.notifyFileUploaded(user, originalFileName);
+        notificationService.broadcastFileUpdate(userId, "upload", originalFileName);
+
+        return ResponseEntity.ok(savedFile);
+    }
+
     // 🔹 Download file
     @GetMapping("/download/{id}")
     public ResponseEntity<Resource> downloadFile(@PathVariable Long id) {
