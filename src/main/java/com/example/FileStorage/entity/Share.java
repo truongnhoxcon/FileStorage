@@ -11,11 +11,11 @@ public class Share {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name="share_link", unique = true, nullable = false, length = 255)
+    @Column(name="share_link", unique = true, nullable = true, length = 255)
     private String shareLink;
 
-    @Column(name="permission", length = 20)
-    private String permission; // VIEW, DOWNLOAD, EDIT
+    @Column(name="permission", length = 20, nullable = false)
+    private String permission; // VIEW, DOWNLOAD, EDIT, ALL
 
     @Column(name="password")
     private String password;
@@ -36,6 +36,11 @@ public class Share {
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
 
+    // Quan hệ N-1 với User (recipient)
+    @ManyToOne
+    @JoinColumn(name = "recipient_id", nullable = false)
+    private User recipient;
+
     // getter, setter
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -53,5 +58,7 @@ public class Share {
     public void setFile(FileEntity file) { this.file = file; }
     public User getOwner() { return owner; }
     public void setOwner(User owner) { this.owner = owner; }
+    public User getRecipient() { return recipient; }
+    public void setRecipient(User recipient) { this.recipient = recipient; }
 }
 
