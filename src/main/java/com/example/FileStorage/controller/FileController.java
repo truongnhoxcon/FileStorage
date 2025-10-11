@@ -52,6 +52,12 @@ public class FileController {
         return fileService.getFilesByUser(userId);
     }
 
+    // 🔹 Lấy danh sách file của user và thư mục được chia sẻ
+    @GetMapping("/user/{userId}/with-shared")
+    public List<com.example.FileStorage.dto.FileWithShareInfo> getFilesWithShared(@PathVariable Long userId) {
+        return fileService.getFilesWithShared(userId);
+    }
+
     // 🔹 Lấy metadata chi tiết file
     @GetMapping("/{id}")
     public ResponseEntity<FileEntity> getFileById(@PathVariable Long id) {

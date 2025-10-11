@@ -65,7 +65,7 @@ function loadFiles(category = currentCategory) {
     const token = localStorage.getItem('token');
     console.log('Token:', token ? 'Present' : 'Missing');
     
-    fetch(`/api/files/user/${currentUser.id}`, {
+    fetch(`/api/files/user/${currentUser.id}/with-shared`, {
         headers: {
             'Authorization': 'Bearer ' + token
         }
@@ -188,26 +188,41 @@ function createFileItem(file) {
     const uploadDate = new Date(file.uploadedAt).toLocaleDateString('vi-VN');
     
     const isDirectory = (file.fileType === 'directory');
+    const isShared = file.isShared || false;
     const onClick = isDirectory ? `openFolder(${file.id})` : `selectFile(${file.id})`;
+    
+    // Chỉ hiển thị nút chia sẻ cho thư mục của chính user (không phải thư mục được chia sẻ)
+    const showShareButton = isDirectory && !isShared;
 
     return `
-        <div class="file-item" data-file-id="${file.id}" onclick="${onClick}">
-            <div class="file-icon ${fileIcon.class}">
+        <div class="file-item ${isShared ? 'shared-item' : ''}" data-file-id="${file.id}" onclick="${onClick}">
+            <div class="file-icon ${fileIcon.class} ${isShared ? 'shared-icon' : ''}">
                 <i class="${fileIcon.icon}"></i>
+                ${isShared ? '<div class="shared-badge"><i class="fas fa-share-alt"></i></div>' : ''}
             </div>
-            <div class="file-name" title="${file.fileName}">${file.fileName}</div>
+            <div class="file-name" title="${file.fileName}">
+                ${file.fileName}
+                ${isShared ? `<span class="shared-label">(Chia sẻ bởi ${file.sharedBy})</span>` : ''}
+            </div>
             <div class="file-size">${fileSize}</div>
             <div class="file-date">${uploadDate}</div>
             <div class="file-actions">
+                ${showShareButton ? `
+                <button class="file-action-btn share" onclick="event.stopPropagation(); showShareModal(${file.id})" title="Chia sẻ">
+                    <i class="fas fa-share-alt"></i>
+                </button>
+                ` : ''}
                 <button class="file-action-btn download" onclick="event.stopPropagation(); downloadFile(${file.id})" title="Tải xuống">
                     <i class="fas fa-download"></i>
                 </button>
                 <button class="file-action-btn info" onclick="event.stopPropagation(); showFileDetails(${file.id})" title="Chi tiết">
                     <i class="fas fa-info"></i>
                 </button>
+                ${!isShared ? `
                 <button class="file-action-btn delete" onclick="event.stopPropagation(); deleteFile(${file.id})" title="Xóa">
                     <i class="fas fa-trash"></i>
                 </button>
+                ` : ''}
             </div>
         </div>
     `;
@@ -382,12 +397,91 @@ function createFolder() {
         alert('Bạn cần đăng nhập.');
         return;
     }
-    const name = prompt('Nhập tên thư mục mới:');
-    if (!name || !name.trim()) return;
+    
+    // Show the create folder modal
+    const modal = new bootstrap.Modal(document.getElementById('createFolderModal'));
+    const folderNameInput = document.getElementById('folderNameInput');
+    const confirmBtn = document.getElementById('confirmCreateFolder');
+    
+    // Reset form
+    folderNameInput.value = '';
+    confirmBtn.disabled = true;
+    
+    // Focus on input when modal is shown
+    modal.show();
+    setTimeout(() => folderNameInput.focus(), 500);
+}
 
+// Handle folder name input validation
+function setupCreateFolderModal() {
+    const folderNameInput = document.getElementById('folderNameInput');
+    const confirmBtn = document.getElementById('confirmCreateFolder');
+    
+    // Input validation
+    folderNameInput.addEventListener('input', function() {
+        const name = this.value.trim();
+        const isValid = name.length > 0 && isValidFolderName(name);
+        
+        confirmBtn.disabled = !isValid;
+        
+        // Visual feedback
+        if (name.length > 0 && !isValidFolderName(name)) {
+            this.classList.add('is-invalid');
+        } else {
+            this.classList.remove('is-invalid');
+        }
+    });
+    
+    // Handle Enter key
+    folderNameInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && !confirmBtn.disabled) {
+            confirmCreateFolder();
+        }
+    });
+    
+    // Confirm button click
+    confirmBtn.addEventListener('click', confirmCreateFolder);
+}
+
+// Validate folder name
+function isValidFolderName(name) {
+    // Check for invalid characters
+    const invalidChars = /[<>:"/\\|?*]/;
+    if (invalidChars.test(name)) {
+        return false;
+    }
+    
+    // Check for reserved names (Windows)
+    const reservedNames = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
+    if (reservedNames.includes(name.toUpperCase())) {
+        return false;
+    }
+    
+    // Check length
+    if (name.length === 0 || name.length > 100) {
+        return false;
+    }
+    
+    return true;
+}
+
+// Confirm create folder
+function confirmCreateFolder() {
+    const folderNameInput = document.getElementById('folderNameInput');
+    const name = folderNameInput.value.trim();
+    
+    if (!name || !isValidFolderName(name)) {
+        return;
+    }
+    
     const form = new URLSearchParams();
-    form.append('name', name.trim());
+    form.append('name', name);
     form.append('userId', currentUser.id);
+
+    // Disable button during request
+    const confirmBtn = document.getElementById('confirmCreateFolder');
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Đang tạo...';
 
     fetch('/api/files/folder', {
         method: 'POST',
@@ -404,17 +498,177 @@ function createFolder() {
         return resp.json();
     })
     .then(() => {
-        showNotification('success', 'Thành công', 'Đã tạo thư mục mới.');
+        // Close modal
+        bootstrap.Modal.getInstance(document.getElementById('createFolderModal')).hide();
+        
+        // Show success notification
+        showNotification('success', 'Thành công', `Đã tạo thư mục "${name}" thành công.`);
+        
+        // Refresh file list
         refreshFiles();
     })
     .catch(err => {
         console.error('Create folder error:', err);
         alert('Không thể tạo thư mục: ' + (err.message || 'Lỗi không xác định'));
+        
+        // Re-enable button
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<i class="fas fa-folder-plus me-1"></i>Tạo thư mục';
     });
+}
+
+// Show share folder modal
+function showShareModal(folderId) {
+    if (!currentUser) {
+        alert('Bạn cần đăng nhập.');
+        return;
+    }
+    
+    const folder = currentFiles.find(f => f.id === folderId);
+    if (!folder || folder.fileType !== 'directory') {
+        alert('Chỉ có thể chia sẻ thư mục.');
+        return;
+    }
+    
+    // Show the share folder modal
+    const modal = new bootstrap.Modal(document.getElementById('shareFolderModal'));
+    const folderNameElement = document.getElementById('shareFolderName');
+    const emailInput = document.getElementById('recipientEmailInput');
+    const confirmBtn = document.getElementById('confirmShareFolder');
+    
+    // Set folder name
+    folderNameElement.textContent = `Chia sẻ thư mục: ${folder.fileName}`;
+    
+    // Reset form
+    emailInput.value = '';
+    confirmBtn.disabled = true;
+    
+    // Store current folder ID for sharing
+    window.currentShareFolderId = folderId;
+    
+    // Focus on email input when modal is shown
+    modal.show();
+    setTimeout(() => emailInput.focus(), 500);
+}
+
+// Setup share folder modal
+function setupShareFolderModal() {
+    const emailInput = document.getElementById('recipientEmailInput');
+    const confirmBtn = document.getElementById('confirmShareFolder');
+    
+    // Email validation
+    emailInput.addEventListener('input', function() {
+        const email = this.value.trim();
+        const isValid = email.length > 0 && isValidEmail(email);
+        
+        confirmBtn.disabled = !isValid;
+        
+        // Visual feedback
+        if (email.length > 0 && !isValidEmail(email)) {
+            this.classList.add('is-invalid');
+        } else {
+            this.classList.remove('is-invalid');
+        }
+    });
+    
+    // Handle Enter key
+    emailInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && !confirmBtn.disabled) {
+            confirmShareFolder();
+        }
+    });
+    
+    // Confirm button click
+    confirmBtn.addEventListener('click', confirmShareFolder);
+}
+
+// Validate email format
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
+
+// Confirm share folder
+function confirmShareFolder() {
+    const emailInput = document.getElementById('recipientEmailInput');
+    const permissionSelect = document.getElementById('permissionSelect');
+    const email = emailInput.value.trim();
+    const permission = permissionSelect.value;
+    
+    if (!email || !isValidEmail(email)) {
+        return;
+    }
+    
+    if (!window.currentShareFolderId) {
+        alert('Lỗi: Không tìm thấy thư mục cần chia sẻ.');
+        return;
+    }
+    
+    const form = new URLSearchParams();
+    form.append('folderId', window.currentShareFolderId);
+    form.append('ownerId', currentUser.id);
+    form.append('recipientEmail', email);
+    form.append('permission', permission);
+
+    // Disable button during request
+    const confirmBtn = document.getElementById('confirmShareFolder');
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Đang chia sẻ...';
+
+    fetch('/api/shares/folder/email', {
+        method: 'POST',
+        headers: {
+            'Authorization': 'Bearer ' + localStorage.getItem('token'),
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: form.toString()
+    })
+    .then(resp => {
+        if (!resp.ok) {
+            return resp.text().then(t => { throw new Error(t || 'Chia sẻ thư mục thất bại'); });
+        }
+        return resp.json();
+    })
+    .then((shareResult) => {
+        // Close modal
+        bootstrap.Modal.getInstance(document.getElementById('shareFolderModal')).hide();
+        
+        // Show success notification
+        showNotification('success', 'Chia sẻ thành công', 
+            `Đã chia sẻ thư mục với ${email} với quyền ${getPermissionText(permission)}.`);
+        
+        // Clear stored folder ID
+        window.currentShareFolderId = null;
+    })
+    .catch(err => {
+        console.error('Share folder error:', err);
+        alert('Không thể chia sẻ thư mục: ' + (err.message || 'Lỗi không xác định'));
+        
+        // Re-enable button
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<i class="fas fa-share-alt me-1"></i>Chia sẻ';
+    });
+}
+
+// Get permission text for display
+function getPermissionText(permission) {
+    const permissionTexts = {
+        'VIEW': 'Xem',
+        'DOWNLOAD': 'Tải xuống',
+        'EDIT': 'Chỉnh sửa',
+        'ALL': 'Toàn quyền'
+    };
+    return permissionTexts[permission] || permission;
 }
 
 // Setup event listeners
 function setupEventListeners() {
+    // Setup create folder modal
+    setupCreateFolderModal();
+    
+    // Setup share folder modal
+    setupShareFolderModal();
+    
     // Upload area click
     document.getElementById('uploadArea').addEventListener('click', () => {
         document.getElementById('fileInput').click();
@@ -642,12 +896,44 @@ function openFolder(fileId) {
     const folder = currentFiles.find(f => f.id === fileId);
     if (!folder || folder.fileType !== 'directory') return;
     currentFolder = folder;
+    updateNavigationUI();
     filterAndDisplayFiles();
 }
 
 function exitFolder() {
     currentFolder = null;
+    updateNavigationUI();
     filterAndDisplayFiles();
+}
+
+// Update navigation UI (back button and breadcrumb)
+function updateNavigationUI() {
+    const backButton = document.getElementById('backButton');
+    const breadcrumbNav = document.getElementById('breadcrumbNav');
+    const currentFolderName = document.getElementById('currentFolderName');
+    const pageTitle = document.getElementById('pageTitle');
+    const pageDescription = document.getElementById('pageDescription');
+    
+    if (currentFolder) {
+        // Show back button and breadcrumb
+        backButton.style.display = 'block';
+        breadcrumbNav.style.display = 'block';
+        
+        // Update breadcrumb
+        currentFolderName.textContent = currentFolder.fileName;
+        
+        // Update page title and description
+        pageTitle.innerHTML = `<i class="fas fa-folder me-2"></i>${currentFolder.fileName}`;
+        pageDescription.textContent = `Nội dung trong thư mục: ${currentFolder.fileName}`;
+    } else {
+        // Hide back button and breadcrumb
+        backButton.style.display = 'none';
+        breadcrumbNav.style.display = 'none';
+        
+        // Reset page title and description
+        pageTitle.innerHTML = '<i class="fas fa-cloud-upload-alt me-2"></i>Quản lý File';
+        pageDescription.textContent = 'Quản lý và tổ chức các file của bạn';
+    }
 }
 
 function normalizePath(p) {

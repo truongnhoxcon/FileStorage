@@ -97,10 +97,34 @@
             <div class="col-md-9 col-lg-10">
                 <!-- Header -->
                 <div class="file-manager-header fade-in">
+                    <!-- Breadcrumb Navigation -->
+                    <div class="breadcrumb-nav mb-3" id="breadcrumbNav" style="display: none;">
+                        <nav aria-label="breadcrumb">
+                            <ol class="breadcrumb">
+                                <li class="breadcrumb-item">
+                                    <a href="#" onclick="exitFolder()" class="breadcrumb-link">
+                                        <i class="fas fa-home me-1"></i>Quản lý file
+                                    </a>
+                                </li>
+                                <li class="breadcrumb-item active" aria-current="page" id="currentFolderName">
+                                    Thư mục hiện tại
+                                </li>
+                            </ol>
+                        </nav>
+                    </div>
+                    
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <div>
-                            <h2><i class="fas fa-cloud-upload-alt me-2"></i>Quản lý File</h2>
-                            <p class="text-muted">Quản lý và tổ chức các file của bạn</p>
+                            <div class="d-flex align-items-center">
+                                <button class="btn btn-outline-secondary me-3" id="backButton" onclick="exitFolder()" style="display: none;">
+                                    <i class="fas fa-arrow-left me-1"></i>
+                                    Quay về
+                                </button>
+                                <div>
+                                    <h2 id="pageTitle"><i class="fas fa-cloud-upload-alt me-2"></i>Quản lý File</h2>
+                                    <p class="text-muted" id="pageDescription">Quản lý và tổ chức các file của bạn</p>
+                                </div>
+                            </div>
                         </div>
                         <div class="d-flex gap-2">
                             <button class="btn btn-outline-secondary" onclick="createFolder()">
@@ -220,6 +244,124 @@
                     <button type="button" class="btn btn-primary" id="downloadFileBtn">
                         <i class="fas fa-download me-1"></i>
                         Tải xuống
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Folder Modal -->
+    <div class="modal fade" id="createFolderModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-folder-plus me-2"></i>
+                        Tạo thư mục mới
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-4">
+                        <div class="folder-icon-large">
+                            <i class="fas fa-folder-plus fa-3x text-primary"></i>
+                        </div>
+                        <h6 class="mt-3">Nhập tên cho thư mục mới</h6>
+                        <p class="text-muted small">Tên thư mục sẽ được sử dụng để tổ chức các file của bạn</p>
+                    </div>
+                    <div class="mb-3">
+                        <label for="folderNameInput" class="form-label">
+                            <i class="fas fa-folder me-1"></i>
+                            Tên thư mục
+                        </label>
+                        <input type="text" class="form-control" id="folderNameInput" 
+                               placeholder="Nhập tên thư mục..." 
+                               maxlength="100"
+                               autocomplete="off">
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Tên thư mục không được chứa các ký tự đặc biệt: / \ : * ? " &lt; &gt; |
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>
+                        Hủy
+                    </button>
+                    <button type="button" class="btn btn-primary" id="confirmCreateFolder" disabled>
+                        <i class="fas fa-folder-plus me-1"></i>
+                        Tạo thư mục
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Folder Modal -->
+    <div class="modal fade" id="shareFolderModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-share-alt me-2"></i>
+                        Chia sẻ thư mục
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-4">
+                        <div class="share-icon-large">
+                            <i class="fas fa-share-alt fa-3x text-success"></i>
+                        </div>
+                        <h6 class="mt-3" id="shareFolderName">Chia sẻ thư mục</h6>
+                        <p class="text-muted small">Chia sẻ thư mục với người khác qua email</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="recipientEmailInput" class="form-label">
+                            <i class="fas fa-envelope me-1"></i>
+                            Email người nhận
+                        </label>
+                        <input type="email" class="form-control" id="recipientEmailInput" 
+                               placeholder="Nhập email người nhận..." 
+                               autocomplete="off">
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Người nhận sẽ nhận được thông báo qua email
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="permissionSelect" class="form-label">
+                            <i class="fas fa-key me-1"></i>
+                            Quyền truy cập
+                        </label>
+                        <select class="form-select" id="permissionSelect">
+                            <option value="VIEW">👁️ Xem (Chỉ xem nội dung)</option>
+                            <option value="DOWNLOAD">⬇️ Tải xuống (Xem và tải xuống)</option>
+                            <option value="EDIT">✏️ Chỉnh sửa (Xem, tải và chỉnh sửa)</option>
+                            <option value="ALL">🔓 Toàn quyền (Tất cả quyền)</option>
+                        </select>
+                        <div class="form-text">
+                            <i class="fas fa-shield-alt me-1"></i>
+                            Chọn quyền phù hợp cho người nhận
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info" role="alert">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        <strong>Lưu ý:</strong> Người nhận cần có tài khoản trong hệ thống để truy cập thư mục được chia sẻ.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>
+                        Hủy
+                    </button>
+                    <button type="button" class="btn btn-success" id="confirmShareFolder" disabled>
+                        <i class="fas fa-share-alt me-1"></i>
+                        Chia sẻ
                     </button>
                 </div>
             </div>

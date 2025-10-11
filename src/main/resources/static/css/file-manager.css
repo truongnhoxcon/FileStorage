@@ -123,6 +123,73 @@ body {
     border: 1px solid rgba(0,0,0,0.05);
 }
 
+/* Breadcrumb Navigation */
+.breadcrumb-nav {
+    background: linear-gradient(135deg, #f8f9ff 0%, #e8f2ff 100%);
+    border-radius: 12px;
+    padding: 15px 20px;
+    border: 1px solid rgba(102, 126, 234, 0.1);
+}
+
+.breadcrumb {
+    margin-bottom: 0;
+    background: transparent;
+    padding: 0;
+}
+
+.breadcrumb-item {
+    font-family: 'Lato', sans-serif;
+    font-weight: 500;
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+    content: ">";
+    color: #6c757d;
+    font-weight: bold;
+}
+
+.breadcrumb-link {
+    color: #667eea;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+}
+
+.breadcrumb-link:hover {
+    color: #5a6fd8;
+    transform: translateX(2px);
+}
+
+.breadcrumb-item.active {
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+/* Back Button */
+#backButton {
+    border: 2px solid #6c757d;
+    color: #6c757d;
+    background: transparent;
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-weight: 600;
+    font-family: 'Lato', sans-serif;
+    transition: all 0.3s ease;
+    min-width: 120px;
+}
+
+#backButton:hover {
+    background: #6c757d;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+}
+
+#backButton:focus {
+    box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.25);
+}
+
 .file-manager-header h2 {
     color: #2c3e50;
     font-weight: 700;
@@ -175,6 +242,34 @@ body {
     color: white;
 }
 
+.file-icon.folder { 
+    background: linear-gradient(135deg, #ffd700, #ffb347); 
+    box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+    position: relative;
+}
+
+.file-icon.folder::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(135deg, #ffd700, #ffb347);
+    border-radius: 14px;
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.file-item:hover .file-icon.folder::before {
+    opacity: 0.3;
+}
+
+.file-item:hover .file-icon.folder {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
+}
 .file-icon.pdf { background: linear-gradient(135deg, #ff6b6b, #ee5a52); }
 .file-icon.doc { background: linear-gradient(135deg, #4ecdc4, #44a08d); }
 .file-icon.image { background: linear-gradient(135deg, #a8edea, #fed6e3); }
@@ -266,6 +361,18 @@ body {
     background: linear-gradient(135deg, #138496, #5a6fd8);
     transform: scale(1.1);
     box-shadow: 0 4px 12px rgba(23, 162, 184, 0.4);
+}
+
+.file-action-btn.share {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+}
+
+.file-action-btn.share:hover {
+    background: linear-gradient(135deg, #218838, #1ea085);
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
 }
 
 /* Upload Area */
@@ -421,6 +528,27 @@ body {
     }
     
     .file-manager-header .btn-group {
+        width: 100%;
+    }
+    
+    /* Mobile breadcrumb and back button */
+    .breadcrumb-nav {
+        padding: 10px 15px;
+    }
+    
+    #backButton {
+        min-width: 100px;
+        padding: 6px 12px;
+        font-size: 14px;
+    }
+    
+    .file-manager-header .d-flex.align-items-center {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 15px;
+    }
+    
+    .file-manager-header .d-flex.align-items-center > div {
         width: 100%;
     }
 }
@@ -594,4 +722,415 @@ body {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border-color: #667eea;
     color: white;
+}
+
+/* Create Folder Modal Styles */
+#createFolderModal .modal-dialog {
+    max-width: 450px;
+}
+
+#createFolderModal .modal-content {
+    border: none;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    overflow: hidden;
+}
+
+#createFolderModal .modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    padding: 25px 30px;
+    position: relative;
+}
+
+#createFolderModal .modal-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+    pointer-events: none;
+}
+
+#createFolderModal .modal-title {
+    font-family: 'Catamaran', sans-serif;
+    font-weight: 700;
+    font-size: 1.3rem;
+    margin: 0;
+    position: relative;
+    z-index: 1;
+}
+
+#createFolderModal .btn-close-white {
+    filter: brightness(0) invert(1);
+    opacity: 0.8;
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 1;
+}
+
+#createFolderModal .btn-close-white:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+#createFolderModal .modal-body {
+    padding: 40px 30px 30px;
+    background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+}
+
+.folder-icon-large {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    border-radius: 20px;
+    border: 2px solid rgba(102, 126, 234, 0.2);
+    transition: all 0.3s ease;
+}
+
+.folder-icon-large:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.2);
+}
+
+#createFolderModal .form-label {
+    font-family: 'Lato', sans-serif;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+#createFolderModal .form-control {
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-family: 'Lato', sans-serif;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+#createFolderModal .form-control:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    background: white;
+}
+
+#createFolderModal .form-control.is-invalid {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+#createFolderModal .form-text {
+    font-size: 12px;
+    color: #6c757d;
+    margin-top: 8px;
+    line-height: 1.4;
+}
+
+#createFolderModal .modal-footer {
+    border: none;
+    padding: 20px 30px 30px;
+    background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+    gap: 12px;
+}
+
+#createFolderModal .modal-footer .btn {
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-weight: 600;
+    font-family: 'Lato', sans-serif;
+    transition: all 0.3s ease;
+    min-width: 120px;
+}
+
+#createFolderModal .modal-footer .btn-secondary {
+    background: #6c757d;
+    border: none;
+    color: white;
+    box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+}
+
+#createFolderModal .modal-footer .btn-secondary:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+}
+
+#createFolderModal .modal-footer .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+#createFolderModal .modal-footer .btn-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+#createFolderModal .modal-footer .btn-primary:disabled {
+    background: #adb5bd;
+    box-shadow: none;
+    transform: none;
+    cursor: not-allowed;
+}
+
+/* Modal Animation */
+#createFolderModal .modal-content {
+    animation: modalSlideIn 0.4s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Responsive Modal */
+@media (max-width: 576px) {
+    #createFolderModal .modal-dialog {
+        margin: 20px;
+        max-width: calc(100% - 40px);
+    }
+    
+    #createFolderModal .modal-body {
+        padding: 30px 20px 20px;
+    }
+    
+    #createFolderModal .modal-footer {
+        padding: 15px 20px 20px;
+        flex-direction: column;
+    }
+    
+    #createFolderModal .modal-footer .btn {
+        width: 100%;
+        margin: 0;
+    }
+    
+    .folder-icon-large {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .folder-icon-large i {
+        font-size: 2rem !important;
+    }
+}
+
+/* Share Folder Modal Styles */
+#shareFolderModal .modal-dialog {
+    max-width: 500px;
+}
+
+#shareFolderModal .modal-content {
+    border: none;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    overflow: hidden;
+}
+
+#shareFolderModal .modal-header {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    border: none;
+    padding: 25px 30px;
+    position: relative;
+}
+
+#shareFolderModal .modal-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+    pointer-events: none;
+}
+
+#shareFolderModal .modal-title {
+    font-family: 'Catamaran', sans-serif;
+    font-weight: 700;
+    font-size: 1.3rem;
+    margin: 0;
+    position: relative;
+    z-index: 1;
+}
+
+#shareFolderModal .btn-close-white {
+    filter: brightness(0) invert(1);
+    opacity: 0.8;
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 1;
+}
+
+#shareFolderModal .btn-close-white:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+#shareFolderModal .modal-body {
+    padding: 40px 30px 30px;
+    background: linear-gradient(135deg, #f8fff9 0%, #ffffff 100%);
+}
+
+.share-icon-large {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.1) 0%, rgba(32, 201, 151, 0.1) 100%);
+    border-radius: 20px;
+    border: 2px solid rgba(40, 167, 69, 0.2);
+    transition: all 0.3s ease;
+}
+
+.share-icon-large:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 25px rgba(40, 167, 69, 0.2);
+}
+
+#shareFolderModal .form-label {
+    font-family: 'Lato', sans-serif;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+#shareFolderModal .form-control,
+#shareFolderModal .form-select {
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-family: 'Lato', sans-serif;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+#shareFolderModal .form-control:focus,
+#shareFolderModal .form-select:focus {
+    border-color: #28a745;
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+    background: white;
+}
+
+#shareFolderModal .form-control.is-invalid {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+#shareFolderModal .form-text {
+    font-size: 12px;
+    color: #6c757d;
+    margin-top: 8px;
+    line-height: 1.4;
+}
+
+#shareFolderModal .alert {
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+    border-left: 4px solid #17a2b8;
+    font-size: 13px;
+}
+
+#shareFolderModal .modal-footer {
+    border: none;
+    padding: 20px 30px 30px;
+    background: linear-gradient(135deg, #f8fff9 0%, #ffffff 100%);
+    gap: 12px;
+}
+
+#shareFolderModal .modal-footer .btn {
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-weight: 600;
+    font-family: 'Lato', sans-serif;
+    transition: all 0.3s ease;
+    min-width: 120px;
+}
+
+#shareFolderModal .modal-footer .btn-secondary {
+    background: #6c757d;
+    border: none;
+    color: white;
+    box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+}
+
+#shareFolderModal .modal-footer .btn-secondary:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+}
+
+#shareFolderModal .modal-footer .btn-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    border: none;
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+#shareFolderModal .modal-footer .btn-success:hover:not(:disabled) {
+    background: linear-gradient(135deg, #218838 0%, #1ea085 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+}
+
+#shareFolderModal .modal-footer .btn-success:disabled {
+    background: #adb5bd;
+    box-shadow: none;
+    transform: none;
+    cursor: not-allowed;
+}
+
+/* Share Modal Animation */
+#shareFolderModal .modal-content {
+    animation: modalSlideIn 0.4s ease-out;
+}
+
+/* Responsive Share Modal */
+@media (max-width: 576px) {
+    #shareFolderModal .modal-dialog {
+        margin: 20px;
+        max-width: calc(100% - 40px);
+    }
+    
+    #shareFolderModal .modal-body {
+        padding: 30px 20px 20px;
+    }
+    
+    #shareFolderModal .modal-footer {
+        padding: 15px 20px 20px;
+        flex-direction: column;
+    }
+    
+    #shareFolderModal .modal-footer .btn {
+        width: 100%;
+        margin: 0;
+    }
+    
+    .share-icon-large {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .share-icon-large i {
+        font-size: 2rem !important;
+    }
 }
