@@ -137,5 +137,46 @@ public class FileService {
         });
         return opt;
     }
+
+    @Transactional
+    public void cascadeMarkDeletedForTree(Long rootId, String oldPrefix, String newPrefix, java.time.LocalDateTime deletedAt) {
+        List<FileEntity> children = fileRepository.findByStoragePathStartingWithAndDeletedAtIsNull(oldPrefix);
+        if (children.isEmpty()) return;
+        for (FileEntity fe : children) {
+            if (fe.getId() != null && fe.getId().equals(rootId)) {
+                continue; // skip root, already updated separately
+            }
+            String current = fe.getStoragePath();
+            String updated = current.replace(oldPrefix, newPrefix);
+            fe.setOriginalPath(current);
+            fe.setStoragePath(updated);
+            fe.setDeletedAt(deletedAt);
+        }
+        fileRepository.saveAll(children);
+    }
+
+    @Transactional
+    public void cascadeRestoreForTree(Long rootId, String trashPrefix) {
+        List<FileEntity> children = fileRepository.findByStoragePathStartingWithAndDeletedAtIsNotNull(trashPrefix);
+        if (children.isEmpty()) return;
+        for (FileEntity fe : children) {
+            if (fe.getId() != null && fe.getId().equals(rootId)) {
+                continue; // skip root, already restored separately
+            }
+            String original = fe.getOriginalPath();
+            if (original != null && !original.isEmpty()) {
+                fe.setStoragePath(original);
+            } else {
+                // Fallback: strip trashPrefix
+                String current = fe.getStoragePath();
+                if (current != null && current.startsWith(trashPrefix)) {
+                    fe.setStoragePath(current.substring(trashPrefix.length()));
+                }
+            }
+            fe.setDeletedAt(null);
+            fe.setOriginalPath(null);
+        }
+        fileRepository.saveAll(children);
+    }
 }
 

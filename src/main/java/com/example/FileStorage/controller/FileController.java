@@ -346,12 +346,23 @@ public class FileController {
             Files.move(currentPath, trashTarget);
 
             // Cập nhật DB: set deletedAt + originalPath + storagePath mới (trong thùng rác)
+            LocalDateTime deletedAt = LocalDateTime.now();
             fileService.updateStorageAndMarkDeleted(
                     id,
                     trashTarget.toString(),
                     currentPath.toString(),
-                    LocalDateTime.now()
+                    deletedAt
             );
+
+            // Nếu là thư mục, cascade đánh dấu xóa mềm cho tất cả phần tử con với prefix mới
+            if ("directory".equalsIgnoreCase(fileEntity.getFileType())) {
+                fileService.cascadeMarkDeletedForTree(
+                        id,
+                        currentPath.toString(),
+                        trashTarget.toString(),
+                        deletedAt
+                );
+            }
 
             // Thông báo realtime
             notificationService.notifyFileDeleted(fileEntity.getUser(), fileEntity.getFileName());
@@ -397,6 +408,13 @@ public class FileController {
             Files.move(trashPath, target);
 
             fileService.clearDeletedAndSetStorage(id, target.toString());
+
+            // Nếu là thư mục: khôi phục cả cây con theo originalPath
+            if ("directory".equalsIgnoreCase(e.getFileType())) {
+                // Dùng trashPath làm prefix để tìm toàn bộ phần tử con đang ở trong thùng rác
+                fileService.cascadeRestoreForTree(id, trashPath.toString());
+            }
+
             notificationService.broadcastFileUpdate(e.getUser().getId(), "restore", e.getFileName());
             return ResponseEntity.ok("✅ Restored");
         } catch (IOException ex) {

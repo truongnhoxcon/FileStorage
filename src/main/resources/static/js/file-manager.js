@@ -18,7 +18,7 @@ function checkAuth() {
         window.location.href = '/login';
         return;
     }
-    
+
     // Get user info
     fetch('/api/users/me', {
         headers: {
