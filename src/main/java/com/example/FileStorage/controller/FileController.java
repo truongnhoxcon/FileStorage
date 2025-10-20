@@ -24,6 +24,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.zip.ZipEntry;
@@ -322,18 +323,48 @@ public class FileController {
 
         FileEntity fileEntity = fileEntityOpt.get();
 
-        // Xóa file trên server
-        File file = new File(fileEntity.getStoragePath());
-        if (file.exists()) {
-            file.delete();
+        try {
+            Path baseUploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+            Path targetPath = Paths.get(fileEntity.getStoragePath()).toAbsolutePath().normalize();
+
+            // Safety: ensure targetPath is within upload dir
+            if (!targetPath.startsWith(baseUploadPath)) {
+                return ResponseEntity.badRequest().body("❌ Invalid file path");
+            }
+
+            File file = targetPath.toFile();
+
+            // Nếu là thư mục: xóa đệ quy toàn bộ nội dung trước
+            if ("directory".equalsIgnoreCase(fileEntity.getFileType()) || file.isDirectory()) {
+                if (Files.exists(targetPath)) {
+                    // walk và xóa từ dưới lên trên
+                    Files.walk(targetPath)
+                            .sorted(Comparator.reverseOrder())
+                            .forEach(p -> {
+                                try {
+                                    Files.deleteIfExists(p);
+                                } catch (IOException e) {
+                                    throw new RuntimeException(e);
+                                }
+                            });
+                }
+                // Xóa toàn bộ metadata của thư mục và các phần tử bên trong
+                fileService.deleteByStoragePathPrefix(targetPath.toString());
+            } else {
+                // File thường
+                Files.deleteIfExists(targetPath);
+                fileService.deleteFile(id);
+            }
+
+            // Thông báo realtime
+            notificationService.notifyFileDeleted(fileEntity.getUser(), fileEntity.getFileName());
+            notificationService.broadcastFileUpdate(fileEntity.getUser().getId(), "delete", fileEntity.getFileName());
+
+            return ResponseEntity.ok("✅ File deleted successfully");
+        } catch (RuntimeException re) {
+            return ResponseEntity.internalServerError().body("❌ Failed to delete: " + re.getCause());
+        } catch (IOException ex) {
+            return ResponseEntity.internalServerError().body("❌ Failed to delete: " + ex.getMessage());
         }
-
-        // Send real-time notification for deletion
-        notificationService.notifyFileDeleted(fileEntity.getUser(), fileEntity.getFileName());
-        notificationService.broadcastFileUpdate(fileEntity.getUser().getId(), "delete", fileEntity.getFileName());
-
-        // Xóa metadata trong DB
-        fileService.deleteFile(id);
-        return ResponseEntity.ok("✅ File deleted successfully");
     }
 }

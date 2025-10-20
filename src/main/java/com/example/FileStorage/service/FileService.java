@@ -101,5 +101,12 @@ public class FileService {
     public void deleteFile(Long id) {
         fileRepository.deleteById(id);
     }
+
+    public void deleteByStoragePathPrefix(String directoryPath) {
+        List<FileEntity> entities = fileRepository.findByStoragePathStartingWith(directoryPath);
+        if (!entities.isEmpty()) {
+            fileRepository.deleteAll(entities);
+        }
+    }
 }
 
