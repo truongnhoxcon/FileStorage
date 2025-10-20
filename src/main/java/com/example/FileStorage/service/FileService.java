@@ -6,6 +6,7 @@ import com.example.FileStorage.entity.Share;
 import com.example.FileStorage.repository.FileRepository;
 import com.example.FileStorage.repository.ShareRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -22,12 +23,12 @@ public class FileService {
     }
 
     public List<FileEntity> getFilesByUser(Long userId) {
-        return fileRepository.findByUserId(userId);
+        return fileRepository.findByUserIdAndDeletedAtIsNull(userId);
     }
 
     public List<FileWithShareInfo> getFilesWithShared(Long userId) {
-        // Lấy file của user
-        List<FileEntity> userFiles = fileRepository.findByUserId(userId);
+        // Lấy file của user (không gồm đã xóa mềm)
+        List<FileEntity> userFiles = fileRepository.findByUserIdAndDeletedAtIsNull(userId);
         
         // Lấy các thư mục được chia sẻ cho user này
         List<Share> sharedShares = shareRepository.findByRecipientId(userId);
@@ -86,8 +87,8 @@ public class FileService {
     }
     
     private List<FileEntity> getFilesInDirectory(String directoryPath) {
-        // Tìm tất cả file có storagePath bắt đầu bằng directoryPath
-        return fileRepository.findByStoragePathStartingWith(directoryPath);
+        // Tìm tất cả file có storagePath bắt đầu bằng directoryPath (không gồm file đã xóa mềm)
+        return fileRepository.findByStoragePathStartingWithAndDeletedAtIsNull(directoryPath);
     }
 
     public Optional<FileEntity> getFileById(Long id) {
@@ -107,6 +108,34 @@ public class FileService {
         if (!entities.isEmpty()) {
             fileRepository.deleteAll(entities);
         }
+    }
+
+    public List<FileEntity> getTrashByUser(Long userId) {
+        return fileRepository.findByUserIdAndDeletedAtIsNotNull(userId);
+    }
+
+    @Transactional
+    public Optional<FileEntity> updateStorageAndMarkDeleted(Long id, String newStoragePath, String originalPath, java.time.LocalDateTime deletedAt) {
+        Optional<FileEntity> opt = fileRepository.findById(id);
+        opt.ifPresent(e -> {
+            e.setOriginalPath(originalPath);
+            e.setDeletedAt(deletedAt);
+            e.setStoragePath(newStoragePath);
+            fileRepository.save(e);
+        });
+        return opt;
+    }
+
+    @Transactional
+    public Optional<FileEntity> clearDeletedAndSetStorage(Long id, String restoredPath) {
+        Optional<FileEntity> opt = fileRepository.findById(id);
+        opt.ifPresent(e -> {
+            e.setStoragePath(restoredPath);
+            e.setDeletedAt(null);
+            e.setOriginalPath(null);
+            fileRepository.save(e);
+        });
+        return opt;
     }
 }
 

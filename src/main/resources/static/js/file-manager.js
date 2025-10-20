@@ -65,7 +65,10 @@ function loadFiles(category = currentCategory) {
     const token = localStorage.getItem('token');
     console.log('Token:', token ? 'Present' : 'Missing');
     
-    fetch(`/api/files/user/${currentUser.id}/with-shared`, {
+    const endpoint = (currentCategory === 'trash')
+        ? `/api/files/user/${currentUser.id}/trash`
+        : `/api/files/user/${currentUser.id}/with-shared`;
+    fetch(endpoint, {
         headers: {
             'Authorization': 'Bearer ' + token
         }
@@ -92,7 +95,7 @@ function loadFiles(category = currentCategory) {
 function filterAndDisplayFiles() {
     let filteredFiles = currentFiles;
     
-    if (currentCategory !== 'all') {
+    if (currentCategory !== 'all' && currentCategory !== 'trash') {
         filteredFiles = currentFiles.filter(file => {
             const fileType = file.fileType || '';
             switch (currentCategory) {
@@ -110,8 +113,8 @@ function filterAndDisplayFiles() {
         });
     }
     
-    // Nếu đang mở thư mục, chỉ hiển thị file/thư mục bên trong thư mục đó
-    if (currentFolder && currentFolder.storagePath) {
+    // Nếu đang mở thư mục, chỉ hiển thị file/thư mục bên trong thư mục đó (không áp dụng cho trash)
+    if (currentCategory !== 'trash' && currentFolder && currentFolder.storagePath) {
         const basePath = normalizePath(currentFolder.storagePath);
         filteredFiles = filteredFiles.filter(file => {
             if (!file || !file.storagePath) return false;
@@ -120,7 +123,7 @@ function filterAndDisplayFiles() {
             if (file.id === currentFolder.id) return false;
             return p.startsWith(basePath + '/');
         });
-    } else {
+    } else if (currentCategory !== 'trash') {
         // Ở chế độ gốc (không mở thư mục), ẩn các file nằm bên trong bất kỳ thư mục nào
         const folderPaths = currentFiles
             .filter(f => f && f.fileType === 'directory' && f.storagePath)
@@ -189,10 +192,11 @@ function createFileItem(file) {
     
     const isDirectory = (file.fileType === 'directory');
     const isShared = file.isShared || false;
-    const onClick = isDirectory ? `openFolder(${file.id})` : `selectFile(${file.id})`;
+    const isTrash = (currentCategory === 'trash');
+    const onClick = (!isTrash && isDirectory) ? `openFolder(${file.id})` : `selectFile(${file.id})`;
     
     // Chỉ hiển thị nút chia sẻ cho thư mục của chính user (không phải thư mục được chia sẻ)
-    const showShareButton = isDirectory && !isShared;
+    const showShareButton = !isTrash && isDirectory && !isShared;
 
     return `
         <div class="file-item ${isShared ? 'shared-item' : ''}" data-file-id="${file.id}" onclick="${onClick}">
@@ -207,6 +211,14 @@ function createFileItem(file) {
             <div class="file-size">${fileSize}</div>
             <div class="file-date">${uploadDate}</div>
             <div class="file-actions">
+                ${isTrash ? `
+                <button class="file-action-btn" onclick="event.stopPropagation(); restoreFile(${file.id})" title="Khôi phục">
+                    <i class="fas fa-undo"></i>
+                </button>
+                <button class="file-action-btn delete" onclick="event.stopPropagation(); purgeFile(${file.id})" title="Xóa vĩnh viễn">
+                    <i class="fas fa-times"></i>
+                </button>
+                ` : `
                 ${showShareButton ? `
                 <button class="file-action-btn share" onclick="event.stopPropagation(); showShareModal(${file.id})" title="Chia sẻ">
                     <i class="fas fa-share-alt"></i>
@@ -223,6 +235,7 @@ function createFileItem(file) {
                     <i class="fas fa-trash"></i>
                 </button>
                 ` : ''}
+                `}
             </div>
         </div>
     `;
@@ -370,8 +383,8 @@ function deleteFile(fileId) {
     })
     .then(response => {
         if (response.ok) {
-            loadFiles(); // Reload files
-            showNotification('info', 'File đã xóa', 'File đã được xóa thành công!');
+            loadFiles();
+            showNotification('info', 'Đã chuyển vào thùng rác', 'Mục đã được đưa vào thùng rác.');
         } else {
             throw new Error('Failed to delete file');
         }
@@ -876,11 +889,54 @@ function handleRealtimeFileUpdate(update) {
     const actionText = {
         'upload': 'đã tải lên',
         'download': 'đã tải xuống', 
-        'delete': 'đã xóa'
+        'delete': 'đã chuyển vào thùng rác',
+        'restore': 'đã khôi phục',
+        'purge': 'đã xóa vĩnh viễn'
     };
     
     const message = `File "${update.fileName}" ${actionText[update.action] || update.action}`;
     showNotification('info', 'File Update', message);
+}
+
+function restoreFile(fileId) {
+    const token = localStorage.getItem('token');
+    fetch(`/api/files/${fileId}/restore`, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token }
+    })
+    .then(resp => {
+        if (!resp.ok) throw new Error('Restore failed');
+        return resp.text();
+    })
+    .then(() => {
+        showNotification('success', 'Khôi phục', 'Mục đã được khôi phục.');
+        loadFiles('trash');
+    })
+    .catch(err => {
+        console.error('Restore error:', err);
+        alert('Không thể khôi phục.');
+    });
+}
+
+function purgeFile(fileId) {
+    if (!confirm('Xóa vĩnh viễn? Hành động này không thể hoàn tác.')) return;
+    const token = localStorage.getItem('token');
+    fetch(`/api/files/${fileId}/purge`, {
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + token }
+    })
+    .then(resp => {
+        if (!resp.ok) throw new Error('Purge failed');
+        return resp.text();
+    })
+    .then(() => {
+        showNotification('info', 'Đã xóa vĩnh viễn', 'Mục đã bị xóa khỏi hệ thống.');
+        loadFiles('trash');
+    })
+    .catch(err => {
+        console.error('Purge error:', err);
+        alert('Không thể xóa vĩnh viễn.');
+    });
 }
 
 // WebSocket connection status handler

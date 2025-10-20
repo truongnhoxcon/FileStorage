@@ -30,6 +30,15 @@ public class FileEntity {
     @Column(name="updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "parent_id")
+    private Long parentId;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @Column(name = "original_path", length = 500)
+    private String originalPath;
+
     // Quan hệ N-1 với User
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
@@ -56,5 +65,11 @@ public class FileEntity {
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     public User getUser() { return user; }
     public void setUser(User user) { this.user = user; }
+    public Long getParentId() { return parentId; }
+    public void setParentId(Long parentId) { this.parentId = parentId; }
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
+    public String getOriginalPath() { return originalPath; }
+    public void setOriginalPath(String originalPath) { this.originalPath = originalPath; }
 }
 

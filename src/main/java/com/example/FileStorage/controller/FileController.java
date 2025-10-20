@@ -313,7 +313,7 @@ public class FileController {
         return tempZip;
     }
 
-    // 🔹 Xóa file
+    // 🔹 Xóa mềm (đưa vào thùng rác)
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteFile(@PathVariable Long id) {
         Optional<FileEntity> fileEntityOpt = fileService.getFileById(id);
@@ -325,46 +325,141 @@ public class FileController {
 
         try {
             Path baseUploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
-            Path targetPath = Paths.get(fileEntity.getStoragePath()).toAbsolutePath().normalize();
+            Path currentPath = Paths.get(fileEntity.getStoragePath()).toAbsolutePath().normalize();
 
-            // Safety: ensure targetPath is within upload dir
-            if (!targetPath.startsWith(baseUploadPath)) {
+            if (!currentPath.startsWith(baseUploadPath)) {
                 return ResponseEntity.badRequest().body("❌ Invalid file path");
             }
 
-            File file = targetPath.toFile();
+            // Tính đường dẫn thùng rác: <uploadDir>/.trash/<userId>/... (giữ nguyên tên hiện tại)
+            Long uid = fileEntity.getUser().getId();
+            Path trashBase = baseUploadPath.resolve(".trash").resolve(String.valueOf(uid)).normalize();
+            Files.createDirectories(trashBase);
 
-            // Nếu là thư mục: xóa đệ quy toàn bộ nội dung trước
-            if ("directory".equalsIgnoreCase(fileEntity.getFileType()) || file.isDirectory()) {
-                if (Files.exists(targetPath)) {
-                    // walk và xóa từ dưới lên trên
-                    Files.walk(targetPath)
-                            .sorted(Comparator.reverseOrder())
-                            .forEach(p -> {
-                                try {
-                                    Files.deleteIfExists(p);
-                                } catch (IOException e) {
-                                    throw new RuntimeException(e);
-                                }
-                            });
-                }
-                // Xóa toàn bộ metadata của thư mục và các phần tử bên trong
-                fileService.deleteByStoragePathPrefix(targetPath.toString());
-            } else {
-                // File thường
-                Files.deleteIfExists(targetPath);
-                fileService.deleteFile(id);
-            }
+            String name = fileEntity.getFileName();
+            Path trashTarget = trashBase.resolve(name).normalize();
+
+            // Tránh đè nếu đã tồn tại trong thùng rác
+            trashTarget = ensureNonConflictPath(trashTarget);
+
+            // Di chuyển vào thùng rác (file hoặc thư mục)
+            Files.move(currentPath, trashTarget);
+
+            // Cập nhật DB: set deletedAt + originalPath + storagePath mới (trong thùng rác)
+            fileService.updateStorageAndMarkDeleted(
+                    id,
+                    trashTarget.toString(),
+                    currentPath.toString(),
+                    LocalDateTime.now()
+            );
 
             // Thông báo realtime
             notificationService.notifyFileDeleted(fileEntity.getUser(), fileEntity.getFileName());
             notificationService.broadcastFileUpdate(fileEntity.getUser().getId(), "delete", fileEntity.getFileName());
 
-            return ResponseEntity.ok("✅ File deleted successfully");
-        } catch (RuntimeException re) {
-            return ResponseEntity.internalServerError().body("❌ Failed to delete: " + re.getCause());
+            return ResponseEntity.ok("✅ Moved to trash");
         } catch (IOException ex) {
-            return ResponseEntity.internalServerError().body("❌ Failed to delete: " + ex.getMessage());
+            return ResponseEntity.internalServerError().body("❌ Failed to move to trash: " + ex.getMessage());
+        }
+    }
+
+    // 🔹 Danh sách thùng rác của user
+    @GetMapping("/user/{userId}/trash")
+    public ResponseEntity<List<FileEntity>> getTrash(@PathVariable Long userId) {
+        List<FileEntity> list = fileService.getTrashByUser(userId);
+        return ResponseEntity.ok(list);
+    }
+
+    // 🔹 Khôi phục từ thùng rác
+    @PostMapping("/{id}/restore")
+    public ResponseEntity<String> restoreFile(@PathVariable Long id) {
+        Optional<FileEntity> opt = fileService.getFileById(id);
+        if (opt.isEmpty()) return ResponseEntity.notFound().build();
+        FileEntity e = opt.get();
+        if (e.getDeletedAt() == null) {
+            return ResponseEntity.badRequest().body("❌ Item is not in trash");
+        }
+
+        try {
+            Path baseUploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+            Path trashPath = Paths.get(e.getStoragePath()).toAbsolutePath().normalize();
+            Path original = e.getOriginalPath() != null
+                    ? Paths.get(e.getOriginalPath()).toAbsolutePath().normalize()
+                    : baseUploadPath.resolve(e.getFileName()).toAbsolutePath().normalize();
+
+            if (!trashPath.startsWith(baseUploadPath)) {
+                return ResponseEntity.badRequest().body("❌ Invalid trash path");
+            }
+
+            // Nếu original tồn tại, tạo tên không xung đột
+            Path target = ensureNonConflictPath(original);
+            Files.createDirectories(target.getParent() != null ? target.getParent() : baseUploadPath);
+            Files.move(trashPath, target);
+
+            fileService.clearDeletedAndSetStorage(id, target.toString());
+            notificationService.broadcastFileUpdate(e.getUser().getId(), "restore", e.getFileName());
+            return ResponseEntity.ok("✅ Restored");
+        } catch (IOException ex) {
+            return ResponseEntity.internalServerError().body("❌ Failed to restore: " + ex.getMessage());
+        }
+    }
+
+    // 🔹 Xóa vĩnh viễn (purge)
+    @DeleteMapping("/{id}/purge")
+    public ResponseEntity<String> purge(@PathVariable Long id) {
+        Optional<FileEntity> fileEntityOpt = fileService.getFileById(id);
+        if (fileEntityOpt.isEmpty()) return ResponseEntity.notFound().build();
+        FileEntity fileEntity = fileEntityOpt.get();
+
+        try {
+            Path baseUploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+            Path targetPath = Paths.get(fileEntity.getStoragePath()).toAbsolutePath().normalize();
+            if (!targetPath.startsWith(baseUploadPath)) {
+                return ResponseEntity.badRequest().body("❌ Invalid file path");
+            }
+
+            File file = targetPath.toFile();
+            if ("directory".equalsIgnoreCase(fileEntity.getFileType()) || file.isDirectory()) {
+                if (Files.exists(targetPath)) {
+                    Files.walk(targetPath)
+                            .sorted(Comparator.reverseOrder())
+                            .forEach(p -> {
+                                try { Files.deleteIfExists(p); } catch (IOException ex) { throw new RuntimeException(ex); }
+                            });
+                }
+                fileService.deleteByStoragePathPrefix(targetPath.toString());
+            } else {
+                Files.deleteIfExists(targetPath);
+                fileService.deleteFile(id);
+            }
+
+            notificationService.broadcastFileUpdate(fileEntity.getUser().getId(), "purge", fileEntity.getFileName());
+            return ResponseEntity.ok("✅ Permanently deleted");
+        } catch (RuntimeException re) {
+            return ResponseEntity.internalServerError().body("❌ Failed to purge: " + re.getCause());
+        } catch (IOException ex) {
+            return ResponseEntity.internalServerError().body("❌ Failed to purge: " + ex.getMessage());
+        }
+    }
+
+    private Path ensureNonConflictPath(Path desired) throws IOException {
+        if (!Files.exists(desired)) return desired;
+        String fileName = desired.getFileName().toString();
+        String base = fileName;
+        String ext = "";
+        int dot = fileName.lastIndexOf('.');
+        if (dot > 0 && dot < fileName.length() - 1) {
+            base = fileName.substring(0, dot);
+            ext = fileName.substring(dot);
+        }
+        int i = 1;
+        Path parent = desired.getParent();
+        while (true) {
+            Path candidate = (parent == null)
+                    ? Paths.get(base + " (" + i + ")" + ext)
+                    : parent.resolve(base + " (" + i + ")" + ext);
+            if (!Files.exists(candidate)) return candidate;
+            i++;
         }
     }
 }

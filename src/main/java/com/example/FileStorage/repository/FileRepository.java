@@ -8,7 +8,12 @@ import java.util.List;
 
 public interface FileRepository extends JpaRepository<FileEntity, Long> {
     List<FileEntity> findByUserId(Long userId);
+    List<FileEntity> findByUserIdAndDeletedAtIsNull(Long userId);
+    List<FileEntity> findByUserIdAndDeletedAtIsNotNull(Long userId);
     
     @Query("SELECT f FROM FileEntity f WHERE f.storagePath LIKE :directoryPath%")
     List<FileEntity> findByStoragePathStartingWith(@Param("directoryPath") String directoryPath);
+
+    List<FileEntity> findByStoragePathStartingWithAndDeletedAtIsNull(String directoryPath);
+    List<FileEntity> findByStoragePathStartingWithAndDeletedAtIsNotNull(String directoryPath);
 }
