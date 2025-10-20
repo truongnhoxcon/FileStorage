@@ -139,6 +139,20 @@ function filterAndDisplayFiles() {
         }
     }
 
+    // Trash: chỉ hiển thị item cấp cao nhất (không hiển thị file con bên trong thư mục đã xóa)
+    if (currentCategory === 'trash') {
+        const items = filteredFiles.filter(f => f && f.originalPath);
+        filteredFiles = items.filter(f => {
+            const p = normalizePath(f.originalPath || '');
+            // Loại bỏ nếu originalPath của f nằm bên trong originalPath của item khác
+            return !items.some(g => {
+                if (!g || g.id === f.id) return false;
+                const gPath = normalizePath(g.originalPath || '');
+                return p.startsWith(gPath + '/');
+            });
+        });
+    }
+
     // Apply search filter
     const searchTerm = document.getElementById('searchInput').value.toLowerCase();
     if (searchTerm) {
