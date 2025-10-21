@@ -30,6 +30,9 @@ public class FileService {
         // Lấy file của user (không gồm đã xóa mềm)
         List<FileEntity> userFiles = fileRepository.findByUserIdAndDeletedAtIsNull(userId);
         
+        // Tính tổng dung lượng cho các thư mục
+        calculateDirectorySizes(userFiles);
+        
         // Lấy các thư mục được chia sẻ cho user này
         List<Share> sharedShares = shareRepository.findByRecipientId(userId);
         Map<Long, Share> sharedFilesMap = sharedShares.stream()
@@ -177,6 +180,59 @@ public class FileService {
             fe.setOriginalPath(null);
         }
         fileRepository.saveAll(children);
+    }
+
+    /**
+     * Tính tổng dung lượng cho các thư mục dựa trên file con bên trong
+     */
+    private void calculateDirectorySizes(List<FileEntity> files) {
+        // Tạo map để tra cứu nhanh theo storagePath
+        Map<String, FileEntity> pathMap = new HashMap<>();
+        for (FileEntity file : files) {
+            if (file.getStoragePath() != null) {
+                pathMap.put(normalizePath(file.getStoragePath()), file);
+            }
+        }
+        
+        // Duyệt qua các thư mục và tính tổng dung lượng
+        for (FileEntity file : files) {
+            if ("directory".equalsIgnoreCase(file.getFileType()) && file.getStoragePath() != null) {
+                long totalSize = calculateDirectorySize(file.getStoragePath(), files);
+                file.setFileSize(totalSize);
+            }
+        }
+    }
+    
+    /**
+     * Tính tổng dung lượng của một thư mục (đệ quy)
+     */
+    private long calculateDirectorySize(String directoryPath, List<FileEntity> allFiles) {
+        String normalizedDirPath = normalizePath(directoryPath);
+        long totalSize = 0;
+        
+        for (FileEntity file : allFiles) {
+            if (file.getStoragePath() == null) continue;
+            
+            String filePath = normalizePath(file.getStoragePath());
+            
+            // Kiểm tra file có nằm trong thư mục này không (trực tiếp hoặc con cháu)
+            if (filePath.startsWith(normalizedDirPath + "/") || filePath.startsWith(normalizedDirPath + "\\")) {
+                if (!"directory".equalsIgnoreCase(file.getFileType())) {
+                    // Nếu là file thực, cộng dung lượng
+                    totalSize += file.getFileSize() != null ? file.getFileSize() : 0;
+                }
+            }
+        }
+        
+        return totalSize;
+    }
+    
+    /**
+     * Chuẩn hóa đường dẫn (chuyển về dạng với dấu gạch chéo /)
+     */
+    private String normalizePath(String path) {
+        if (path == null) return "";
+        return path.replace("\\", "/");
     }
 }
 
