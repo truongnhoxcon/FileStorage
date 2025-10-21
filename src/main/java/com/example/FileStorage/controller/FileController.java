@@ -1,11 +1,15 @@
 package com.example.FileStorage.controller;
 
 import com.example.FileStorage.entity.FileEntity;
+import com.example.FileStorage.entity.Share;
 import com.example.FileStorage.entity.User;
 import com.example.FileStorage.repository.UserRepository;
 import com.example.FileStorage.service.FileService;
+import com.example.FileStorage.service.ShareService;
+import com.example.FileStorage.security.JwtService;
 import com.example.FileStorage.websocket.NotificationService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -37,14 +41,18 @@ public class FileController {
     private final FileService fileService;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final ShareService shareService;
+    private final JwtService jwtService;
 
     @Value("${file.upload-dir}")   // Lấy từ application.properties
     private String uploadDir;
 
-    public FileController(FileService fileService, UserRepository userRepository, NotificationService notificationService) {
+    public FileController(FileService fileService, UserRepository userRepository, NotificationService notificationService, ShareService shareService, JwtService jwtService) {
         this.fileService = fileService;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.shareService = shareService;
+        this.jwtService = jwtService;
     }
 
     // 🔹 Lấy danh sách file theo userId
@@ -315,13 +323,35 @@ public class FileController {
 
     // 🔹 Xóa mềm (đưa vào thùng rác)
     @DeleteMapping("/{id}")
-    public ResponseEntity<String> deleteFile(@PathVariable Long id) {
+    public ResponseEntity<String> deleteFile(@PathVariable Long id, @RequestHeader("Authorization") String authHeader) {
         Optional<FileEntity> fileEntityOpt = fileService.getFileById(id);
         if (fileEntityOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
         FileEntity fileEntity = fileEntityOpt.get();
+        
+        // Lấy user hiện tại từ token
+        String token = authHeader.replace("Bearer ", "");
+        String username = jwtService.extractUsername(token);
+        User currentUser = userRepository.findByUsername(username).orElse(null);
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("❌ Unauthorized");
+        }
+        
+        // Kiểm tra xem file có phải được share cho user hiện tại không
+        Share shareRecord = shareService.findByFileIdAndRecipientId(id, currentUser.getId());
+        if (shareRecord != null) {
+            // File được share → chỉ xóa bản ghi share (unshare), không xóa file gốc
+            shareService.deleteShare(shareRecord.getId());
+            notificationService.broadcastFileUpdate(currentUser.getId(), "unshare", fileEntity.getFileName());
+            return ResponseEntity.ok("✅ Removed from your shared items");
+        }
+        
+        // File thuộc sở hữu của user → xóa mềm bình thường
+        if (!fileEntity.getUser().getId().equals(currentUser.getId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("❌ You don't have permission to delete this file");
+        }
 
         try {
             Path baseUploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();

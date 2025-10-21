@@ -80,5 +80,9 @@ public class ShareService {
         s.setPermission(permission);
         return shareRepository.save(s);
     }
+
+    public Share findByFileIdAndRecipientId(Long fileId, Long recipientId) {
+        return shareRepository.findByFileIdAndRecipientId(fileId, recipientId);
+    }
 }
 

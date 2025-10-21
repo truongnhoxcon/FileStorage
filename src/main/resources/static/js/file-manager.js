@@ -905,7 +905,8 @@ function handleRealtimeFileUpdate(update) {
         'download': 'đã tải xuống', 
         'delete': 'đã chuyển vào thùng rác',
         'restore': 'đã khôi phục',
-        'purge': 'đã xóa vĩnh viễn'
+        'purge': 'đã xóa vĩnh viễn',
+        'unshare': 'đã xóa khỏi mục được chia sẻ'
     };
     
     const message = `File "${update.fileName}" ${actionText[update.action] || update.action}`;
