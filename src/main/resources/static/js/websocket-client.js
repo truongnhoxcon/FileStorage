@@ -258,7 +258,7 @@ class WebSocketClient {
         if (typeof handleWebSocketStatus === 'function') {
             handleWebSocketStatus(true);
         }
-        this.showConnectionStatus('connected');
+        this.updateConnectionDot('connected');
     }
 
     onDisconnected() {
@@ -266,7 +266,7 @@ class WebSocketClient {
         if (typeof handleWebSocketStatus === 'function') {
             handleWebSocketStatus(false);
         }
-        this.showConnectionStatus('disconnected');
+        this.updateConnectionDot('disconnected');
     }
 
     onError(error) {
@@ -274,26 +274,14 @@ class WebSocketClient {
         if (typeof handleWebSocketStatus === 'function') {
             handleWebSocketStatus(false);
         }
-        this.showConnectionStatus('error');
+        this.updateConnectionDot('disconnected');
     }
 
-    showConnectionStatus(status) {
-        let statusElement = document.getElementById('connection-status');
-        if (!statusElement) {
-            statusElement = document.createElement('div');
-            statusElement.id = 'connection-status';
-            statusElement.className = 'connection-status';
-            document.body.appendChild(statusElement);
+    updateConnectionDot(status) {
+        const statusDot = document.querySelector('#connectionStatus .status-dot');
+        if (statusDot) {
+            statusDot.className = 'status-dot ' + status;
         }
-
-        const statusText = {
-            'connected': '🟢 Connected',
-            'disconnected': '🔴 Disconnected',
-            'error': '⚠️ Connection Error'
-        };
-
-        statusElement.textContent = statusText[status] || status;
-        statusElement.className = `connection-status ${status}`;
     }
 
     // Public methods for sending messages

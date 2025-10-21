@@ -188,6 +188,25 @@
     animation: pulse 2s infinite;
 }
 
+/* Connection Status Dot (Simple) */
+.status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    transition: background-color 0.3s ease;
+}
+
+.status-dot.connected {
+    background-color: #4CAF50;
+    box-shadow: 0 0 6px rgba(76, 175, 80, 0.6);
+}
+
+.status-dot.disconnected {
+    background-color: #f44336;
+    box-shadow: 0 0 6px rgba(244, 67, 54, 0.6);
+}
+
 @keyframes pulse {
     0% {
         transform: scale(1);

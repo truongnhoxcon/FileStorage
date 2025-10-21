@@ -750,6 +750,12 @@ function setupEventListeners() {
             }
         });
     });
+    
+    // Force list view on page load
+    const fileGrid = document.getElementById('fileGrid');
+    if (fileGrid) {
+        fileGrid.classList.add('list-view');
+    }
 }
 
 // Upload files

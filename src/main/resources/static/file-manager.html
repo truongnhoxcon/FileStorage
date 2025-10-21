@@ -33,9 +33,8 @@
                                 <div class="avatar-ghost">👻</div>
                             </div>
                             <span id="userName">User</span>
-                            <span class="live-indicator ms-2" id="liveIndicator" style="display: none;">
-                                <span class="live-dot"></span>
-                                Live
+                            <span class="connection-status ms-2" id="connectionStatus">
+                                <span class="status-dot disconnected"></span>
                             </span>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
@@ -164,13 +163,13 @@
                                 <option value="type">Sắp xếp theo loại</option>
                             </select>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-3" style="display: none;">
                             <div class="btn-group" role="group">
-                                <input type="radio" class="btn-check" name="viewMode" id="gridView" checked>
+                                <input type="radio" class="btn-check" name="viewMode" id="gridView">
                                 <label class="btn btn-outline-secondary" for="gridView">
                                     <i class="fas fa-th"></i>
                                 </label>
-                                <input type="radio" class="btn-check" name="viewMode" id="listView">
+                                <input type="radio" class="btn-check" name="viewMode" id="listView" checked>
                                 <label class="btn btn-outline-secondary" for="listView">
                                     <i class="fas fa-list"></i>
                                 </label>
