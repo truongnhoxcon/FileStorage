@@ -400,6 +400,52 @@ body {
     box-shadow: 0 12px 30px rgba(102, 126, 234, 0.2);
 }
 
+/* Selected Files Display */
+#selectedFiles {
+    animation: fadeIn 0.3s ease-in;
+}
+
+#selectedFiles h6 {
+    color: #495057;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+#fileList .list-group-item {
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    transition: all 0.2s ease;
+}
+
+#fileList .list-group-item:hover {
+    background-color: #f8f9fa;
+    transform: translateX(5px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+#fileList .list-group-item i.fa-file-image { color: #28a745; }
+#fileList .list-group-item i.fa-file-video { color: #dc3545; }
+#fileList .list-group-item i.fa-file-audio { color: #ffc107; }
+#fileList .list-group-item i.fa-file-pdf { color: #dc3545; }
+#fileList .list-group-item i.fa-file-word { color: #0d6efd; }
+#fileList .list-group-item i.fa-file-excel { color: #28a745; }
+#fileList .list-group-item i.fa-file-powerpoint { color: #fd7e14; }
+#fileList .list-group-item i.fa-file-archive { color: #6c757d; }
+#fileList .list-group-item i.fa-file-code { color: #6f42c1; }
+#fileList .list-group-item i.fa-file { color: #6c757d; }
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 /* Empty State */
 .empty-state {
     background: white;

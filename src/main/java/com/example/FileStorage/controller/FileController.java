@@ -28,6 +28,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -75,14 +79,14 @@ public class FileController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // 🔹 Upload file
+    // 🔹 Upload file (hỗ trợ nhiều file)
     @PostMapping("/upload")
     public ResponseEntity<?> uploadFile(
-            @RequestParam("file") MultipartFile file,
+            @RequestParam("file") MultipartFile[] files,
             @RequestParam("userId") Long userId) throws IOException {
 
-        if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body("❌ File is empty!");
+        if (files == null || files.length == 0) {
+            return ResponseEntity.badRequest().body("❌ No files provided!");
         }
 
         // Kiểm tra user
@@ -93,33 +97,59 @@ public class FileController {
         Path baseUploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
         Files.createDirectories(baseUploadPath);
 
-        // Tạo tên file duy nhất và loại bỏ mọi path traversal
-        String originalFileName = file.getOriginalFilename();
-        String safeFileName = originalFileName == null ? "file" : Paths.get(originalFileName).getFileName().toString();
-        String uniqueFileName = System.currentTimeMillis() + "_" + safeFileName;
-        Path destinationPath = baseUploadPath.resolve(uniqueFileName).normalize();
+        List<FileEntity> uploadedFiles = new ArrayList<>();
 
-        // Lưu file bằng NIO để tránh phụ thuộc đường dẫn tạm của Tomcat
-        try (InputStream inputStream = file.getInputStream()) {
-            Files.copy(inputStream, destinationPath, StandardCopyOption.REPLACE_EXISTING);
+        // Xử lý từng file
+        for (MultipartFile file : files) {
+            if (file.isEmpty()) {
+                continue; // Bỏ qua file rỗng
+            }
+
+            // Tạo tên file duy nhất và loại bỏ mọi path traversal
+            String originalFileName = file.getOriginalFilename();
+            String safeFileName = originalFileName == null ? "file" : Paths.get(originalFileName).getFileName().toString();
+            String uniqueFileName = System.currentTimeMillis() + "_" + safeFileName;
+            Path destinationPath = baseUploadPath.resolve(uniqueFileName).normalize();
+
+            // Lưu file bằng NIO để tránh phụ thuộc đường dẫn tạm của Tomcat
+            try (InputStream inputStream = file.getInputStream()) {
+                Files.copy(inputStream, destinationPath, StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            // Tạo metadata và lưu DB
+            FileEntity fileEntity = new FileEntity();
+            fileEntity.setFileName(originalFileName);
+            fileEntity.setFileType(file.getContentType());
+            fileEntity.setFileSize(file.getSize());
+            fileEntity.setStoragePath(destinationPath.toString());
+            fileEntity.setUser(user);
+            fileEntity.setUploadedAt(LocalDateTime.now());
+
+            FileEntity savedFile = fileService.saveFile(fileEntity);
+            uploadedFiles.add(savedFile);
+
+            // Send real-time notification
+            notificationService.notifyFileUploaded(user, originalFileName);
+            notificationService.broadcastFileUpdate(userId, "upload", originalFileName);
+
+            // Thêm delay nhỏ để tránh trùng timestamp
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
 
-        // Tạo metadata và lưu DB
-        FileEntity fileEntity = new FileEntity();
-        fileEntity.setFileName(originalFileName);
-        fileEntity.setFileType(file.getContentType());
-        fileEntity.setFileSize(file.getSize());
-        fileEntity.setStoragePath(destinationPath.toString());
-        fileEntity.setUser(user);
-        fileEntity.setUploadedAt(LocalDateTime.now());
-
-        FileEntity savedFile = fileService.saveFile(fileEntity);
-
-        // Send real-time notification
-        notificationService.notifyFileUploaded(user, originalFileName);
-        notificationService.broadcastFileUpdate(userId, "upload", originalFileName);
-
-        return ResponseEntity.ok(savedFile);
+        // Trả về kết quả
+        if (uploadedFiles.size() == 1) {
+            return ResponseEntity.ok(uploadedFiles.get(0));
+        } else {
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Upload thành công " + uploadedFiles.size() + " file");
+            response.put("files", uploadedFiles);
+            response.put("count", uploadedFiles.size());
+            return ResponseEntity.ok(response);
+        }
     }
 
     // 🔹 Tạo thư mục
@@ -180,16 +210,16 @@ public class FileController {
         return ResponseEntity.ok(savedFolder);
     }
 
-    // 🔹 Upload file vào thư mục
+    // 🔹 Upload file vào thư mục (hỗ trợ nhiều file)
     @PostMapping("/upload-to-folder")
     public ResponseEntity<?> uploadFileToFolder(
-            @RequestParam("file") MultipartFile file,
+            @RequestParam("file") MultipartFile[] files,
             @RequestParam("folderId") Long folderId,
             @RequestParam("userId") Long userId
     ) throws IOException {
 
-        if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body("❌ File is empty!");
+        if (files == null || files.length == 0) {
+            return ResponseEntity.badRequest().body("❌ No files provided!");
         }
 
         // Lấy thông tin thư mục
@@ -217,33 +247,59 @@ public class FileController {
             return ResponseEntity.badRequest().body("❌ Invalid folder path");
         }
 
-        // Sanitized file name
-        String originalFileName = file.getOriginalFilename();
-        String safeFileName = originalFileName == null ? "file" : Paths.get(originalFileName).getFileName().toString();
-        String uniqueFileName = System.currentTimeMillis() + "_" + safeFileName;
-        Path destinationPath = targetFolderPath.resolve(uniqueFileName).normalize();
+        List<FileEntity> uploadedFiles = new ArrayList<>();
 
-        // Ghi file
-        try (InputStream inputStream = file.getInputStream()) {
-            Files.copy(inputStream, destinationPath, StandardCopyOption.REPLACE_EXISTING);
+        // Xử lý từng file
+        for (MultipartFile file : files) {
+            if (file.isEmpty()) {
+                continue; // Bỏ qua file rỗng
+            }
+
+            // Sanitized file name
+            String originalFileName = file.getOriginalFilename();
+            String safeFileName = originalFileName == null ? "file" : Paths.get(originalFileName).getFileName().toString();
+            String uniqueFileName = System.currentTimeMillis() + "_" + safeFileName;
+            Path destinationPath = targetFolderPath.resolve(uniqueFileName).normalize();
+
+            // Ghi file
+            try (InputStream inputStream = file.getInputStream()) {
+                Files.copy(inputStream, destinationPath, StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            // Lưu metadata file
+            FileEntity fileEntity = new FileEntity();
+            fileEntity.setFileName(originalFileName);
+            fileEntity.setFileType(file.getContentType());
+            fileEntity.setFileSize(file.getSize());
+            fileEntity.setStoragePath(destinationPath.toString());
+            fileEntity.setUser(user);
+            fileEntity.setUploadedAt(LocalDateTime.now());
+
+            FileEntity savedFile = fileService.saveFile(fileEntity);
+            uploadedFiles.add(savedFile);
+
+            // Thông báo realtime
+            notificationService.notifyFileUploaded(user, originalFileName);
+            notificationService.broadcastFileUpdate(userId, "upload", originalFileName);
+
+            // Thêm delay nhỏ để tránh trùng timestamp
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
 
-        // Lưu metadata file
-        FileEntity fileEntity = new FileEntity();
-        fileEntity.setFileName(originalFileName);
-        fileEntity.setFileType(file.getContentType());
-        fileEntity.setFileSize(file.getSize());
-        fileEntity.setStoragePath(destinationPath.toString());
-        fileEntity.setUser(user);
-        fileEntity.setUploadedAt(LocalDateTime.now());
-
-        FileEntity savedFile = fileService.saveFile(fileEntity);
-
-        // Thông báo realtime
-        notificationService.notifyFileUploaded(user, originalFileName);
-        notificationService.broadcastFileUpdate(userId, "upload", originalFileName);
-
-        return ResponseEntity.ok(savedFile);
+        // Trả về kết quả
+        if (uploadedFiles.size() == 1) {
+            return ResponseEntity.ok(uploadedFiles.get(0));
+        } else {
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Upload thành công " + uploadedFiles.size() + " file vào thư mục");
+            response.put("files", uploadedFiles);
+            response.put("count", uploadedFiles.size());
+            return ResponseEntity.ok(response);
+        }
     }
 
     // 🔹 Download file

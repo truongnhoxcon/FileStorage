@@ -415,6 +415,8 @@ function showUploadModal() {
     document.getElementById('fileInput').value = '';
     document.getElementById('confirmUpload').disabled = true;
     document.getElementById('uploadProgress').style.display = 'none';
+    document.getElementById('selectedFiles').style.display = 'none';
+    document.getElementById('uploadArea').style.display = 'block';
     modal.show();
 }
 
@@ -705,6 +707,7 @@ function setupEventListeners() {
     document.getElementById('fileInput').addEventListener('change', (e) => {
         const files = e.target.files;
         if (files.length > 0) {
+            displaySelectedFiles(files);
             document.getElementById('confirmUpload').disabled = false;
             document.getElementById('confirmUpload').onclick = () => uploadFiles(files);
         }
@@ -728,6 +731,7 @@ function setupEventListeners() {
         const files = e.dataTransfer.files;
         if (files.length > 0) {
             document.getElementById('fileInput').files = files;
+            displaySelectedFiles(files);
             document.getElementById('confirmUpload').disabled = false;
             document.getElementById('confirmUpload').onclick = () => uploadFiles(files);
         }
@@ -758,6 +762,102 @@ function setupEventListeners() {
     }
 }
 
+// Display selected files
+function displaySelectedFiles(files) {
+    const selectedFilesDiv = document.getElementById('selectedFiles');
+    const fileListDiv = document.getElementById('fileList');
+    const uploadArea = document.getElementById('uploadArea');
+    
+    // Clear previous file list
+    fileListDiv.innerHTML = '';
+    
+    // Show selected files section and hide upload area
+    uploadArea.style.display = 'none';
+    selectedFilesDiv.style.display = 'block';
+    
+    // Helper function to format file size
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+    
+    // Helper function to get file icon
+    function getFileIcon(fileName) {
+        const ext = fileName.split('.').pop().toLowerCase();
+        const iconMap = {
+            // Images
+            'jpg': 'fa-file-image',
+            'jpeg': 'fa-file-image',
+            'png': 'fa-file-image',
+            'gif': 'fa-file-image',
+            'bmp': 'fa-file-image',
+            'svg': 'fa-file-image',
+            // Videos
+            'mp4': 'fa-file-video',
+            'avi': 'fa-file-video',
+            'mov': 'fa-file-video',
+            'wmv': 'fa-file-video',
+            // Audio
+            'mp3': 'fa-file-audio',
+            'wav': 'fa-file-audio',
+            'flac': 'fa-file-audio',
+            // Documents
+            'pdf': 'fa-file-pdf',
+            'doc': 'fa-file-word',
+            'docx': 'fa-file-word',
+            'xls': 'fa-file-excel',
+            'xlsx': 'fa-file-excel',
+            'ppt': 'fa-file-powerpoint',
+            'pptx': 'fa-file-powerpoint',
+            'txt': 'fa-file-alt',
+            // Archives
+            'zip': 'fa-file-archive',
+            'rar': 'fa-file-archive',
+            '7z': 'fa-file-archive',
+            // Code
+            'html': 'fa-file-code',
+            'css': 'fa-file-code',
+            'js': 'fa-file-code',
+            'java': 'fa-file-code',
+            'py': 'fa-file-code',
+            'cpp': 'fa-file-code',
+            'c': 'fa-file-code'
+        };
+        return iconMap[ext] || 'fa-file';
+    }
+    
+    // Display each file
+    Array.from(files).forEach((file, index) => {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+        fileItem.innerHTML = `
+            <div class="d-flex align-items-center">
+                <i class="fas ${getFileIcon(file.name)} fa-2x me-3 text-primary"></i>
+                <div>
+                    <div class="fw-bold">${file.name}</div>
+                    <small class="text-muted">${formatFileSize(file.size)}</small>
+                </div>
+            </div>
+            <button class="btn btn-sm btn-outline-danger" onclick="removeSelectedFile(${index})" title="Hủy và chọn lại">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        fileListDiv.appendChild(fileItem);
+    });
+}
+
+// Remove selected file
+function removeSelectedFile(index) {
+    // Reset the file input and UI
+    document.getElementById('fileInput').value = '';
+    document.getElementById('confirmUpload').disabled = true;
+    document.getElementById('selectedFiles').style.display = 'none';
+    document.getElementById('uploadArea').style.display = 'block';
+}
+
 // Upload files
 function uploadFiles(files) {
     if (!currentUser) {
@@ -785,8 +885,18 @@ function uploadFiles(files) {
     console.log('FormData userId:', formData.get('userId'));
 
     // Show progress
-    document.getElementById('uploadProgress').style.display = 'block';
+    const uploadProgressDiv = document.getElementById('uploadProgress');
+    const uploadArea = document.getElementById('uploadArea');
+    const selectedFilesDiv = document.getElementById('selectedFiles');
     const progressBar = document.querySelector('.progress-bar');
+    const progressText = document.querySelector('#uploadProgress p');
+    
+    // Hide upload area and selected files, show progress
+    uploadArea.style.display = 'none';
+    selectedFilesDiv.style.display = 'none';
+    uploadProgressDiv.style.display = 'block';
+    progressBar.style.width = '0%';
+    progressBar.textContent = '0%';
     
     const isInFolder = !!(currentFolder && currentFolder.id);
     const url = isInFolder ? '/api/files/upload-to-folder' : '/api/files/upload';
@@ -794,42 +904,84 @@ function uploadFiles(files) {
         formData.append('folderId', currentFolder.id);
     }
 
-    fetch(url, {
-        method: 'POST',
-        headers: {
-            'Authorization': 'Bearer ' + localStorage.getItem('token')
-        },
-        body: formData
-    })
-    .then(response => {
-        console.log('Upload response status:', response.status);
-        console.log('Upload response headers:', response.headers);
-        
-        if (!response.ok) {
-            // Try to get error message from response
-            return response.text().then(text => {
-                console.error('Upload error response:', text);
-                throw new Error(`HTTP error! status: ${response.status}, message: ${text}`);
-            });
+    // Use XMLHttpRequest to track upload progress
+    const xhr = new XMLHttpRequest();
+    
+    // Track upload progress
+    xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100);
+            progressBar.style.width = percentComplete + '%';
+            progressBar.textContent = percentComplete + '%';
+            progressBar.setAttribute('aria-valuenow', percentComplete);
+            progressText.textContent = `Đang tải lên... ${percentComplete}%`;
         }
-        return response.json();
-    })
-    .then(data => {
-        console.log('Upload successful:', data);
-        loadFiles(); // Reload file list
-        bootstrap.Modal.getInstance(document.getElementById('uploadModal')).hide();
-        
-        // Show success notification
-        showNotification('success', 'Upload thành công!', `File "${data.fileName}" đã được tải lên thành công.`);
-    })
-    .catch(error => {
-        console.error('Upload error:', error);
-        alert('Có lỗi xảy ra khi upload file: ' + error.message);
-    })
-    .finally(() => {
-        document.getElementById('uploadProgress').style.display = 'none';
-        progressBar.style.width = '0%';
     });
+    
+    // Handle completion
+    xhr.addEventListener('load', () => {
+        console.log('Upload response status:', xhr.status);
+        
+        if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+                const data = JSON.parse(xhr.responseText);
+                console.log('Upload successful:', data);
+                loadFiles(); // Reload file list
+                bootstrap.Modal.getInstance(document.getElementById('uploadModal')).hide();
+                
+                // Show success notification based on response type
+                if (data.count && data.count > 1) {
+                    // Multiple files uploaded
+                    showNotification('success', 'Upload thành công!', `Đã tải lên ${data.count} file thành công.`);
+                } else if (data.fileName) {
+                    // Single file uploaded
+                    showNotification('success', 'Upload thành công!', `File "${data.fileName}" đã được tải lên thành công.`);
+                } else {
+                    // Fallback
+                    showNotification('success', 'Upload thành công!', 'File đã được tải lên thành công.');
+                }
+            } catch (error) {
+                console.error('Error parsing response:', error);
+                alert('Có lỗi xảy ra khi xử lý phản hồi từ server');
+            }
+        } else {
+            console.error('Upload error response:', xhr.responseText);
+            alert(`Có lỗi xảy ra khi upload file: ${xhr.status} - ${xhr.responseText}`);
+        }
+        
+        // Reset progress
+        uploadProgressDiv.style.display = 'none';
+        uploadArea.style.display = 'block';
+        progressBar.style.width = '0%';
+        progressBar.textContent = '0%';
+        progressText.textContent = 'Đang tải lên...';
+    });
+    
+    // Handle errors
+    xhr.addEventListener('error', () => {
+        console.error('Upload error');
+        alert('Có lỗi xảy ra khi upload file');
+        uploadProgressDiv.style.display = 'none';
+        uploadArea.style.display = 'block';
+        progressBar.style.width = '0%';
+        progressBar.textContent = '0%';
+        progressText.textContent = 'Đang tải lên...';
+    });
+    
+    // Handle abort
+    xhr.addEventListener('abort', () => {
+        console.log('Upload aborted');
+        uploadProgressDiv.style.display = 'none';
+        uploadArea.style.display = 'block';
+        progressBar.style.width = '0%';
+        progressBar.textContent = '0%';
+        progressText.textContent = 'Đang tải lên...';
+    });
+    
+    // Open and send request
+    xhr.open('POST', url);
+    xhr.setRequestHeader('Authorization', 'Bearer ' + localStorage.getItem('token'));
+    xhr.send(formData);
 }
 
 // Refresh files
